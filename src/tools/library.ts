@@ -27,6 +27,10 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
         searchInQuestions: z.boolean().optional(),
         searchInAnswers: z.boolean().optional(),
         searchInTags: z.boolean().optional(),
+        lastUpdatedDate: z
+          .object({ gte: z.string().optional(), lte: z.string().optional() })
+          .optional()
+          .describe("Filter by last-updated date range (ISO-8601 timestamps)"),
       },
       handler: (args) =>
         guard(async () => {
