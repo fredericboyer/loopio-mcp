@@ -2,6 +2,8 @@
 
 A local [MCP](https://modelcontextprotocol.io) server exposing the Loopio Data API (v2) to MCP clients (Claude Desktop, Claude Code). Read-only by default; writes and deletes are opt-in.
 
+> **Unofficial.** This is an independent, community-built project. It is not affiliated with, endorsed by, or supported by Loopio Inc. "Loopio" is a trademark of its respective owner and is used here only to identify the API this server targets. Use of the Loopio API is subject to Loopio's own terms.
+
 ## Tools
 
 Read (always on): `search_library`, `get_library_entry`, `get_library_structure`, `list_projects`, `get_project`, `get_project_questions`, `get_project_status_summary`.
