@@ -1,15 +1,19 @@
 {
   "name": "loopio-mcp",
   "version": "0.1.0",
-  "private": true,
+  "description": "Model Context Protocol (stdio) server wrapping the Loopio Data API v2.",
   "type": "module",
+  "license": "MIT",
   "bin": { "loopio-mcp": "dist/server.js" },
+  "files": ["dist"],
+  "engines": { "node": ">=18" },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/server.ts",
     "start": "node dist/server.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
