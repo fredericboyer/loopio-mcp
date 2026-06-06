@@ -13,7 +13,10 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "spec:fetch": "tsx scripts/fetch-loopio-spec.ts",
+    "spec:types": "openapi-typescript specs/loopio-openapi.yaml -o src/loopio/openapi.generated.ts",
+    "spec:update": "npm run spec:fetch && npm run spec:types"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
@@ -21,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "openapi-typescript": "^7.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
