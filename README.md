@@ -21,9 +21,9 @@ Delete (require `LOOPIO_ENABLE_WRITES=true` and `LOOPIO_ENABLE_DELETES=true`): `
 ```json
 {
   "mcpServers": {
-    "loopio": {
+    "loopio-mcp": {
       "command": "node",
-      "args": ["C:/Projects/loopio/dist/server.js"],
+      "args": ["C:/Projects/loopio-mcp/dist/server.js"],
       "env": {
         "LOOPIO_CLIENT_ID": "your-client-id",
         "LOOPIO_CLIENT_SECRET": "your-client-secret",
