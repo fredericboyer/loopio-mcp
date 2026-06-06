@@ -52,10 +52,19 @@ Scopes (verified, granular):
 
 Conventions:
 
-- Pagination: `page` and `pageSize` query parameters.
-- Async: long-running operations enqueue a task; poll `GET /asyncTasks/{taskId}` for status.
-- `inline[]` query parameter on several reads expands related data (e.g. `@mergeVariables`).
-- Errors use a documented `Error` schema. Library update is JSON Patch (`PATCH`). Project entry answer is a full `PUT`.
+- Pagination: `page` and `pageSize` query parameters. All list endpoints return the same envelope: `{ totalItems, totalPages, items: [...] }`. The client loops pages using `totalPages` up to the max-results cap. The in-scope list/search endpoints are synchronous (no async polling needed).
+- Async: only certain out-of-scope operations (bulk Library import, create-project-from-template, merge-variable deletion) enqueue a task polled via `GET /asyncTasks/{taskId}`. None of the 11 in-scope tools use it.
+- `inline[]` query parameter on several reads expands related data (`@mergeVariables` on library reads, `@imagePlaceholders` on project entry reads/writes).
+- Errors use a documented `Error` schema. Library update is JSON Patch (`PATCH`, media type `application/json-patch+json`). Project entry answer is a full `PUT`.
+
+### Request/response shapes (verified)
+
+- `search_library` filter (`LibrarySearchOptions`, passed as a JSON object in the `filter` query param, plus `page`/`pageSize`): `searchQuery`, `language`, `locations[] {stackID, categoryID, subCategoryID}`, `synonyms`, `exactPhrase`, `hasAttachment`, `searchInQuestions` (default true), `searchInAnswers` (default true), `searchInTags` (default true), `lastUpdatedDate` (date-time range). At least one property required.
+- `create_library_entry` body: `questions[] {text*, complianceOption?}` (>=1), `answer {text*}`, `location {stackID*, categoryID?, subCategoryID?}`, `languageCode` (de|en|es|fr|pt|other, default en), `tags[]`. Required: `questions`, `answer`, `location`.
+- `update_library_entry` body: JSON Patch array (`application/json-patch+json`) against the entry.
+- `answer_project_entry` body (`PUT /projectEntries/{id}`): `{ question?: string|null, answer: object }`.
+- `list_projects` filters: `rfxTypes` (RFP|RFI|DDQ|SQ|PP|OTHER), `owners` (user ids).
+- `get_project_status_summary`: `lastUpdatedDateGt` (required) returns `{ totalItems, items: ProjectSummary[] }`.
 
 ### Tool-to-endpoint map (verified)
 
@@ -77,10 +86,8 @@ The broader Loopio API (~60 operations: Users, Teams, Webhooks, Merge Variables,
 
 ## Remaining items to confirm during implementation
 
-- Exact `filter` syntax for `GET /libraryEntries` (documented in the `LibrarySearchOptions` model; pull from the spec when building `search_library`).
-- Pagination response envelope (whether total counts / next markers are returned) and whether `GET /libraryEntries` ever enqueues an async task for large result sets.
-- Rate-limit headers (`Retry-After` presence) and documented limits.
-- Exact request body shape for `create_library_entry` and `update_library_entry` (from the `LibraryEntry` / `JsonPatch` models).
+- Rate-limit headers (`Retry-After` presence) and documented limits are not described in the spec. Implement defensive `429` handling (honor `Retry-After` if present, else exponential backoff) and confirm behavior against the live API during the smoke test.
+- The `complianceOption` object shape on questions (only needed if creating entries that use Answer Sets / Compliance Sets); not required for the common create path.
 
 ## Architecture
 
@@ -99,7 +106,7 @@ MCP client (Claude Desktop / Claude Code)
 | loopio/          domain client (no MCP deps)   |
 |   auth.ts        token cache + refresh          |
 |   http.ts        fetch wrapper: auth header,    |
-|                  429 backoff, async poll, paging|
+|                  429 backoff, pagination         |
 |   library.ts     typed library calls            |
 |   projects.ts    typed project calls            |
 |   types.ts       shared response types          |
@@ -112,7 +119,7 @@ Principles:
 
 - The `loopio/` client has no MCP dependency. It is a plain typed SDK, unit-testable and reusable. The `tools/` layer adapts it to MCP (schemas, result formatting, error shaping).
 - Write and delete tools are registered conditionally. When a flag is off, the corresponding tools are never added to the server, so Claude cannot see or call them.
-- Pagination and the async request/poll search pattern are encapsulated in the domain client. Tools return complete results up to a cap; Claude never manages cursors or poll loops.
+- Pagination is encapsulated in the domain client (loop `page` to `totalPages` up to the max-results cap). Tools return complete results up to the cap; Claude never manages cursors. The in-scope tools need no async polling.
 
 ## Tool catalog
 
@@ -150,8 +157,7 @@ Eleven tools, organized by domain (see the verified tool-to-endpoint map above f
   - `LOOPIO_ENABLE_DELETES` adds: `library:delete`.
   A read-only server can never obtain a write-capable token. An optional `LOOPIO_SCOPES` env var overrides the derived set. If the App Client was not created with a requested scope, the token request fails fast with a clear message pointing at app setup.
 - HTTP wrapper (`http.ts`): injects the bearer header. On `401`, refresh once and retry. On `429`, honor `Retry-After` or use exponential backoff, up to a small retry cap. On `5xx`, retry with backoff. A hard ceiling on total retries prevents a tool call from hanging the client.
-- Async search: when a search returns the request/poll pattern (job id plus poll URL), the wrapper polls with backoff until complete or a timeout, then returns results. Claude only ever sees the final result.
-- Pagination: the domain client follows pages internally up to a configurable max-results cap (default 200). If results are truncated, the tool response says so explicitly. No silent truncation.
+- Pagination: the domain client follows pages internally (`page` to `totalPages`) up to a configurable max-results cap (default 200). If results are truncated, the tool response says so explicitly, including `totalItems`. No silent truncation.
 - Error surface: tool errors return a structured, readable message (HTTP status, Loopio error body summary, originating tool and args). No raw stack traces. Auth misconfiguration (missing or invalid creds) fails fast at startup with a clear message.
 
 ## Configuration
@@ -191,7 +197,7 @@ README documents registering the Loopio app, the env vars, and a sample MCP clie
 
 ## Testing
 
-- Unit tests with mocked `fetch` for the `loopio/` client: token refresh/expiry, 401 retry, 429 backoff, async poll loop, pagination cap and truncation flag. These are the bug-prone parts and need no live API.
+- Unit tests with mocked `fetch` for the `loopio/` client: token refresh/expiry, 401 retry, 429 backoff, pagination loop (`totalPages`), cap and truncation flag. These are the bug-prone parts and need no live API.
 - Tool-handler tests: zod schema validation (bad inputs rejected), and that write/delete tools are absent when flags are off and present when on.
 - Optional integration check against the Loopio Stoplight mock server (`https://stoplight.io/mocks/loopio/loopio-api/84330`) by pointing `LOOPIO_HOST`/base at the mock, exercising real request/response shapes without real creds or production data.
 - One manual smoke check against the live API (documented in README), run with real creds.
@@ -199,11 +205,11 @@ README documents registering the Loopio app, the env vars, and a sample MCP clie
 
 ## Build sequence (high level)
 
-1. Pull the remaining model details (`LibrarySearchOptions` filter syntax, `LibraryEntry`/`JsonPatch` request bodies, pagination envelope) from the Stoplight spec.
-2. Scaffold project, config parsing, env validation.
-3. Build and test the `loopio/` client (auth, http, library, projects).
-4. Build the `tools/` layer with conditional registration.
-5. Wire `server.ts` to stdio transport.
+1. Scaffold project, config parsing, env validation.
+2. Build and test the `loopio/` client (auth, http, library, projects).
+3. Build the `tools/` layer with conditional registration.
+4. Wire `server.ts` to stdio transport.
+5. Optional: validate against the Stoplight mock server.
 6. Manual smoke test with real creds; write README.
 
 The detailed implementation plan follows in a separate document via the writing-plans step.
