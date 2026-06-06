@@ -66,7 +66,20 @@ Then point your client at the built entry file, using an absolute path:
 }
 ```
 
-To enable writes, set `LOOPIO_ENABLE_WRITES` to `true` (and `LOOPIO_ENABLE_DELETES` to `true` to also allow deletes). The server requests only the scopes matching the enabled tiers.
+### Environment variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `LOOPIO_CLIENT_ID` | Yes | — | OAuth2 client id from the Loopio app. |
+| `LOOPIO_CLIENT_SECRET` | Yes | — | OAuth2 client secret (shown only once at app creation). |
+| `LOOPIO_ENABLE_WRITES` | No | `false` | Enable the write tools (`create_library_entry`, `update_library_entry`, `answer_project_entry`). |
+| `LOOPIO_ENABLE_DELETES` | No | `false` | Enable the delete tool (`delete_library_entry`). Ignored unless `LOOPIO_ENABLE_WRITES` is also `true`. |
+| `LOOPIO_HOST` | No | `api.loopio.com` | API host. Use `api.int01.loopio.com` for Loopio's test environment. |
+| `LOOPIO_API_BASE_PATH` | No | `/data/v2` | API base path. |
+| `LOOPIO_SCOPES` | No | derived from the flags above | Space-delimited override of the requested OAuth scopes. |
+| `LOOPIO_MAX_RESULTS` | No | `200` | Maximum items returned per list/search tool (must be a positive integer). |
+
+The server requests only the OAuth scopes matching the enabled tiers, so a read-only deployment never holds write or delete scopes.
 
 ## Testing against the mock server
 
