@@ -89,6 +89,11 @@ describe("libraryTools", () => {
     expect(res.content[0].text).toMatch(/deleted/i);
   });
 
+  it("search_library schema exposes the lastUpdatedDate range filter", () => {
+    const def = libraryTools(fakeLibraryApi() as any).find((d) => d.name === "search_library")!;
+    expect(def.inputSchema).toHaveProperty("lastUpdatedDate");
+  });
+
   it("wraps Loopio errors as isError results", async () => {
     const api = fakeLibraryApi();
     const { LoopioError } = await import("../src/loopio/http.js");
