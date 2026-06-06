@@ -74,3 +74,9 @@ export interface AnswerProjectEntryBody {
   question?: string | null;
   answer: Record<string, unknown>;
 }
+
+/** Response of GET /projects/summary: a flat list with a total, no pagination cursor. */
+export interface ProjectStatusSummaryResult {
+  totalItems: number;
+  items: ProjectSummary[];
+}

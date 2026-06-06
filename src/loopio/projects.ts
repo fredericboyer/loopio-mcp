@@ -4,6 +4,7 @@ import type {
   CappedResult,
   Project,
   ProjectEntry,
+  ProjectStatusSummaryResult,
   ProjectSummary,
 } from "./types.js";
 
@@ -40,8 +41,8 @@ export class ProjectsApi {
     );
   }
 
-  getProjectStatusSummary(lastUpdatedDateGt: string): Promise<CappedResult<ProjectSummary>> {
-    return this.http.request<CappedResult<ProjectSummary>>("GET", "/projects/summary", {
+  getProjectStatusSummary(lastUpdatedDateGt: string): Promise<ProjectStatusSummaryResult> {
+    return this.http.request<ProjectStatusSummaryResult>("GET", "/projects/summary", {
       query: { lastUpdatedDateGt },
     });
   }
