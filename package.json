@@ -19,6 +19,9 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
+    "format": "oxfmt src test scripts vitest.config.ts",
+    "format:check": "oxfmt --check src test scripts vitest.config.ts",
     "prepare": "npm run build",
     "spec:fetch": "tsx scripts/fetch-loopio-spec.ts",
     "spec:types": "openapi-typescript specs/loopio-openapi.yaml -o src/loopio/openapi.generated.ts",
@@ -31,8 +34,10 @@
   "devDependencies": {
     "@types/node": "^25.9.2",
     "openapi-typescript": "^7.4.0",
+    "oxfmt": "0.53.0",
+    "oxlint": "^1.68.0",
     "tsx": "^4.19.0",
-    "typescript": "^6.0.3",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.8"
   }
 }

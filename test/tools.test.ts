@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-import { z } from "zod";
 import { selectTools, registerTools, type ToolDef } from "../src/tools/registry.js";
 import { libraryTools } from "../src/tools/library.js";
 import { projectTools } from "../src/tools/projects.js";

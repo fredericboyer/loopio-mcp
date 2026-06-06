@@ -5,7 +5,6 @@ import type {
   Project,
   ProjectEntry,
   ProjectStatusSummaryResult,
-  ProjectSummary,
 } from "./types.js";
 
 export class ProjectsApi {

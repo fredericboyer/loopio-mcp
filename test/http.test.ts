@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { LoopioHttpClient, LoopioError, buildQuery } from "../src/loopio/http.js";
+import { LoopioHttpClient, buildQuery } from "../src/loopio/http.js";
 import type { LoopioConfig } from "../src/config.js";
 import type { Page } from "../src/loopio/types.js";
 
