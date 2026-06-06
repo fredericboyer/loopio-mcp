@@ -56,7 +56,7 @@ function fakeLibraryApi() {
 }
 
 describe("libraryTools", () => {
-  it("defines the five library tools with correct tiers", () => {
+  it("defines the six library tools with correct tiers", () => {
     const defs = libraryTools(fakeLibraryApi() as any);
     const byName = Object.fromEntries(defs.map((d) => [d.name, d.tier]));
     expect(byName).toEqual({
