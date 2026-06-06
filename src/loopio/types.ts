@@ -1,3 +1,15 @@
+import type { components } from "./openapi.generated.js";
+
+/**
+ * Types that map cleanly to Loopio's published API are *derived* from the
+ * generated OpenAPI types (./openapi.generated.ts) so they cannot drift from the
+ * spec; regenerate with `npm run spec:update`. Shapes that are intentionally open
+ * (large responses we only partially consume) or that the spec models differently
+ * from how we build them (JSON Patch, the create-only question shape) stay
+ * hand-written below.
+ */
+type Schemas = components["schemas"];
+
 /** Standard paged envelope returned by all Loopio list endpoints. */
 export interface Page<T> {
   totalItems: number;
@@ -12,32 +24,26 @@ export interface CappedResult<T> {
   truncated: boolean;
 }
 
-export interface ReferenceLabel {
-  id: number;
-  name: string;
-}
+/** Derived from the spec. */
+export type ReferenceLabel = Schemas["ReferenceLabel"];
 
-export interface LibraryLocation {
-  stackID: number;
-  categoryID?: number;
-  subCategoryID?: number;
-}
+/** Derived from the spec (categoryID/subCategoryID are nullable per Loopio). */
+export type LibraryLocation = Schemas["LibraryLocation"];
 
-export type LanguageCode = "de" | "en" | "es" | "fr" | "pt" | "other";
+/** Derived from the spec. */
+export type LanguageCode = Schemas["LanguageCode"];
 
-export interface LibrarySearchOptions {
-  searchQuery?: string;
-  language?: string;
-  locations?: LibraryLocation[];
-  synonyms?: boolean;
-  exactPhrase?: boolean;
-  hasAttachment?: boolean;
-  searchInQuestions?: boolean;
-  searchInAnswers?: boolean;
-  searchInTags?: boolean;
-  lastUpdatedDate?: { gte?: string; lte?: string };
-}
+/**
+ * Derived from the spec, made fully optional: every filter field is optional for
+ * us, whereas the spec marks the searchIn* flags required (they default to true).
+ */
+export type LibrarySearchOptions = Partial<Schemas["LibrarySearchOptions"]>;
 
+/**
+ * Create-specific question shape: text is required and there is no id. This
+ * deliberately differs from the spec's `Question` (a response model with an
+ * optional text and an id), so it is not derived.
+ */
 export interface LibraryEntryQuestion {
   text: string;
   complianceOption?: Record<string, unknown> | null;
@@ -51,6 +57,10 @@ export interface CreateLibraryEntryBody {
   tags?: string[];
 }
 
+/**
+ * Hand-written: the spec models JSON Patch as an op-discriminated union, but we
+ * forward a flat list of ops and let Loopio validate the operation semantics.
+ */
 export type JsonPatchOp = {
   op: "add" | "remove" | "replace" | "move" | "copy" | "test";
   path: string;
@@ -59,7 +69,8 @@ export type JsonPatchOp = {
 };
 
 /** Library entry, project, project entry, and stack shapes are large and only
- *  partially consumed. Model them as open records plus the fields we surface. */
+ *  partially consumed. Model them as open records plus the fields we surface;
+ *  deriving the closed spec schemas would over-constrain response reads. */
 export type LibraryEntry = Record<string, unknown> & {
   id: number;
   status?: string;
