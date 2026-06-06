@@ -34,7 +34,8 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
     {
       name: "get_project_questions",
       tier: "read",
-      description: "List a project's entries (questions, current answers, status), filterable by section.",
+      description:
+        "List a project's entries (questions, current answers, status), filterable by section.",
       inputSchema: {
         projectId: z.number(),
         sectionId: z.number().optional(),
@@ -59,7 +60,8 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
     {
       name: "get_project_status_summary",
       tier: "read",
-      description: "Get status summaries for projects updated after a given ISO timestamp (for reporting/triage).",
+      description:
+        "Get status summaries for projects updated after a given ISO timestamp (for reporting/triage).",
       inputSchema: {
         lastUpdatedDateGt: z.string().describe("ISO-8601 timestamp, e.g. 2026-01-01T00:00:00Z"),
       },
@@ -71,7 +73,8 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
     {
       name: "answer_project_entry",
       tier: "write",
-      description: "Set or update the answer (and optionally the question text) on a project entry.",
+      description:
+        "Set or update the answer (and optionally the question text) on a project entry.",
       inputSchema: {
         id: z.number().describe("Project entry id"),
         answerText: z.string().describe("The answer text to write"),

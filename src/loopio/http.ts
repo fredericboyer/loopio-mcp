@@ -71,11 +71,7 @@ export class LoopioHttpClient {
     this.maxRetries = opts.maxRetries ?? 3;
   }
 
-  async request<T = unknown>(
-    method: string,
-    path: string,
-    opts: RequestOptions = {},
-  ): Promise<T> {
+  async request<T = unknown>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
     const url = this.cfg.apiBaseUrl + path + (opts.query ? buildQuery(opts.query) : "");
     let attempt = 0;
     let didAuthRetry = false;

@@ -21,7 +21,10 @@ export class TokenManager {
   private expiresAt = 0;
   private inflight: Promise<string> | null = null;
 
-  constructor(private cfg: LoopioConfig, opts: TokenManagerOptions = {}) {
+  constructor(
+    private cfg: LoopioConfig,
+    opts: TokenManagerOptions = {},
+  ) {
     this.fetchFn = opts.fetchFn ?? fetch;
     this.now = opts.now ?? (() => Date.now());
     this.skew = opts.refreshSkewMs ?? 60_000;

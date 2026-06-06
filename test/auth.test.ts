@@ -60,9 +60,9 @@ describe("TokenManager", () => {
   });
 
   it("shares a single in-flight refresh", async () => {
-    const fetchFn = vi.fn().mockImplementation(
-      () => new Promise((r) => setTimeout(() => r(tokenResponse("tok1")), 10)),
-    );
+    const fetchFn = vi
+      .fn()
+      .mockImplementation(() => new Promise((r) => setTimeout(() => r(tokenResponse("tok1")), 10)));
     const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
     const [a, b] = await Promise.all([tm.getToken(), tm.getToken()]);
     expect(a).toBe("tok1");
@@ -71,9 +71,7 @@ describe("TokenManager", () => {
   });
 
   it("throws a clear error on token failure", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(
-      new Response("bad creds", { status: 401 }),
-    );
+    const fetchFn = vi.fn().mockResolvedValue(new Response("bad creds", { status: 401 }));
     const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
     await expect(tm.getToken()).rejects.toThrow(/token request failed.*401/i);
   });

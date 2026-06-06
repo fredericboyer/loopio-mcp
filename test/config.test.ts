@@ -12,7 +12,10 @@ describe("deriveScopes", () => {
   });
   it("adds write scopes when writes enabled", () => {
     expect(deriveScopes(true, false)).toEqual([
-      "library:read", "project:read", "library:write", "project:write",
+      "library:read",
+      "project:read",
+      "library:write",
+      "project:write",
     ]);
   });
   it("adds delete scope only when writes also enabled", () => {

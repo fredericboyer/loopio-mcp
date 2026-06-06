@@ -19,7 +19,10 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
         "Returns matched entries with question, answer, location, and status.",
       inputSchema: {
         searchQuery: z.string().optional().describe("Free-text query over Library entries"),
-        language: z.string().optional().describe("Language code, e.g. 'en'. Empty shows all languages"),
+        language: z
+          .string()
+          .optional()
+          .describe("Language code, e.g. 'en'. Empty shows all languages"),
         locations: z.array(locationSchema).optional().describe("Restrict to stacks/categories"),
         synonyms: z.boolean().optional(),
         exactPhrase: z.boolean().optional(),
@@ -49,7 +52,10 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
       description: "Get the full detail of one Library entry by id.",
       inputSchema: {
         id: z.number().describe("Library entry id"),
-        expandMergeVariables: z.boolean().optional().describe("Substitute merge variable placeholders"),
+        expandMergeVariables: z
+          .boolean()
+          .optional()
+          .describe("Substitute merge variable placeholders"),
       },
       handler: (args) =>
         guard(async () => {
@@ -60,7 +66,8 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
     {
       name: "get_library_structure",
       tier: "read",
-      description: "List the full Library structure (stacks, categories, subcategories) for scoping searches and resolving location ids.",
+      description:
+        "List the full Library structure (stacks, categories, subcategories) for scoping searches and resolving location ids.",
       inputSchema: {},
       handler: () => guard(async () => jsonResult(await api.getLibraryStructure())),
     },

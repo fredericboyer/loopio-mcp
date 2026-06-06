@@ -9,7 +9,10 @@ import type {
 } from "./types.js";
 
 export class LibraryApi {
-  constructor(private http: LoopioHttpClient, private maxResults: number) {}
+  constructor(
+    private http: LoopioHttpClient,
+    private maxResults: number,
+  ) {}
 
   searchLibrary(
     filter: LibrarySearchOptions,

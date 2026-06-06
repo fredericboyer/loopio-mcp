@@ -8,7 +8,10 @@ import type {
 } from "./types.js";
 
 export class ProjectsApi {
-  constructor(private http: LoopioHttpClient, private maxResults: number) {}
+  constructor(
+    private http: LoopioHttpClient,
+    private maxResults: number,
+  ) {}
 
   listProjects(
     opts: { rfxTypes?: string[]; owners?: number[]; maxResults?: number } = {},
@@ -27,7 +30,12 @@ export class ProjectsApi {
 
   getProjectQuestions(
     projectId: number,
-    opts: { sectionId?: number; subSectionId?: number; inline?: string[]; maxResults?: number } = {},
+    opts: {
+      sectionId?: number;
+      subSectionId?: number;
+      inline?: string[];
+      maxResults?: number;
+    } = {},
   ): Promise<CappedResult<ProjectEntry>> {
     const query: Record<string, unknown> = { projectId };
     if (opts.sectionId !== undefined) query.sectionId = opts.sectionId;

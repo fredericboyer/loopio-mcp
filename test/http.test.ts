@@ -87,7 +87,9 @@ describe("LoopioHttpClient.request", () => {
 
 describe("LoopioHttpClient.getPaged", () => {
   function page(items: number[], totalItems: number, totalPages: number): Response {
-    return json({ items: items.map((id) => ({ id })), totalItems, totalPages } satisfies Page<{ id: number }>);
+    return json({ items: items.map((id) => ({ id })), totalItems, totalPages } satisfies Page<{
+      id: number;
+    }>);
   }
 
   it("follows pages up to totalPages and aggregates items", async () => {

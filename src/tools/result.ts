@@ -11,11 +11,7 @@ export function textResult(text: string): CallToolResult {
 
 export function errorResult(err: unknown): CallToolResult {
   const text =
-    err instanceof LoopioError
-      ? err.message
-      : err instanceof Error
-        ? err.message
-        : String(err);
+    err instanceof LoopioError ? err.message : err instanceof Error ? err.message : String(err);
   return { content: [{ type: "text", text }], isError: true };
 }
 

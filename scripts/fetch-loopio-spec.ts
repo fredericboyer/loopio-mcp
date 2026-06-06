@@ -33,11 +33,7 @@ const OUT_PATH = resolve(
  * doesn't read like a non-trivial OpenAPI YAML document.
  */
 function looksLikeOpenApiYaml(body: string): boolean {
-  return (
-    body.length > 10_000 &&
-    /^openapi:\s*3\./m.test(body) &&
-    /^paths:/m.test(body)
-  );
+  return body.length > 10_000 && /^openapi:\s*3\./m.test(body) && /^paths:/m.test(body);
 }
 
 async function main(): Promise<void> {
