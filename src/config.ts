@@ -1,0 +1,57 @@
+export interface LoopioConfig {
+  clientId: string;
+  clientSecret: string;
+  host: string;
+  apiBasePath: string;
+  tokenUrl: string;
+  apiBaseUrl: string;
+  scopes: string[];
+  enableWrites: boolean;
+  enableDeletes: boolean;
+  maxResults: number;
+}
+
+type Env = Record<string, string | undefined>;
+
+function boolEnv(v: string | undefined): boolean {
+  return v === "true" || v === "1";
+}
+
+export function deriveScopes(enableWrites: boolean, enableDeletes: boolean): string[] {
+  const scopes = ["library:read", "project:read"];
+  if (enableWrites) scopes.push("library:write", "project:write");
+  if (enableWrites && enableDeletes) scopes.push("library:delete");
+  return scopes;
+}
+
+export function loadConfig(env: Env = process.env): LoopioConfig {
+  const clientId = env.LOOPIO_CLIENT_ID;
+  const clientSecret = env.LOOPIO_CLIENT_SECRET;
+  if (!clientId) throw new Error("Missing required env var LOOPIO_CLIENT_ID");
+  if (!clientSecret) throw new Error("Missing required env var LOOPIO_CLIENT_SECRET");
+
+  const host = env.LOOPIO_HOST ?? "api.loopio.com";
+  const apiBasePath = env.LOOPIO_API_BASE_PATH ?? "/data/v2";
+  const enableWrites = boolEnv(env.LOOPIO_ENABLE_WRITES);
+  // Deletes are ignored unless writes are also enabled.
+  const enableDeletes = enableWrites && boolEnv(env.LOOPIO_ENABLE_DELETES);
+
+  const scopes = env.LOOPIO_SCOPES
+    ? env.LOOPIO_SCOPES.split(/\s+/).filter(Boolean)
+    : deriveScopes(enableWrites, enableDeletes);
+
+  const maxResults = env.LOOPIO_MAX_RESULTS ? Number(env.LOOPIO_MAX_RESULTS) : 200;
+
+  return {
+    clientId,
+    clientSecret,
+    host,
+    apiBasePath,
+    tokenUrl: `https://${host}/oauth2/access_token`,
+    apiBaseUrl: `https://${host}${apiBasePath}`,
+    scopes,
+    enableWrites,
+    enableDeletes,
+    maxResults,
+  };
+}
