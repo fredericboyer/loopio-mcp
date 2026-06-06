@@ -14,18 +14,48 @@ Delete (require `LOOPIO_ENABLE_WRITES=true` and `LOOPIO_ENABLE_DELETES=true`): `
 
 ## Setup
 
-1. In Loopio, sign in as an Admin and go to **Admin > Integrations > For Developers > Add an App**. Select the scopes you need (`library:read`, `project:read`, and optionally `library:write`, `project:write`, `library:delete`). Scopes cannot be changed after creation, so select every scope you might enable. Copy the Client ID and Secret (the secret is shown only once).
-2. `npm install && npm run build`
-3. Configure your MCP client (below).
+In Loopio, sign in as an Admin and go to **Admin > Integrations > For Developers > Add an App**. Select the scopes you need (`library:read`, `project:read`, and optionally `library:write`, `project:write`, `library:delete`). Scopes cannot be changed after creation, so select every scope you might enable. Copy the Client ID and Secret (the secret is shown only once).
 
 ## MCP client configuration
+
+Add the server to your MCP client (Claude Desktop, Claude Code). Run it directly with `npx` (no checkout needed), or build from source.
+
+### With npx (recommended)
+
+Requires the package to be published to npm.
+
+```json
+{
+  "mcpServers": {
+    "loopio-mcp": {
+      "command": "npx",
+      "args": ["-y", "loopio-mcp"],
+      "env": {
+        "LOOPIO_CLIENT_ID": "your-client-id",
+        "LOOPIO_CLIENT_SECRET": "your-client-secret",
+        "LOOPIO_ENABLE_WRITES": "false"
+      }
+    }
+  }
+}
+```
+
+### From source
+
+```bash
+git clone https://github.com/fredericboyer/loopio-mcp
+cd loopio-mcp
+npm install && npm run build
+```
+
+Then point your client at the built entry file, using an absolute path:
 
 ```json
 {
   "mcpServers": {
     "loopio-mcp": {
       "command": "node",
-      "args": ["C:/Projects/loopio-mcp/dist/server.js"],
+      "args": ["/absolute/path/to/loopio-mcp/dist/server.js"],
       "env": {
         "LOOPIO_CLIENT_ID": "your-client-id",
         "LOOPIO_CLIENT_SECRET": "your-client-secret",
