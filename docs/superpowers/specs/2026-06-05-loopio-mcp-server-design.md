@@ -27,17 +27,26 @@ A local, stdio-based Model Context Protocol (MCP) server, written in TypeScript,
 |-------|----------|
 | Runtime | TypeScript / Node, official `@modelcontextprotocol/sdk` |
 | Transport | stdio (local) |
-| Auth | OAuth 2.0 client credentials; creds via env vars |
+| Auth | OAuth 2.0 client credentials; `application/x-www-form-urlencoded`; creds via env vars |
+| Scopes | Requested scopes derived from enabled tiers (least privilege at the token level) |
+| Host | Single `LOOPIO_HOST` (default `api.loopio.com`); token URL and API base derive from it |
 | Tool surface | Task-oriented (curated tools mapped to intent, not raw REST) |
 | Write safety | Read-only by default; writes opt-in via `LOOPIO_ENABLE_WRITES` |
 | Delete safety | Separate `LOOPIO_ENABLE_DELETES` flag, requires writes also on |
 
+## Confirmed from Loopio Getting Started docs
+
+- Token endpoint: `POST https://{host}/oauth2/access_token`, `Content-Type: application/x-www-form-urlencoded`, body `grant_type=client_credentials`, `scope` (space-delimited), `client_id`, `client_secret`.
+- Token response: `{ "token_type": "Bearer", "expires_in": 3600, "access_token": "..." }`. API requests carry `Authorization: Bearer {token}`.
+- Hosts are datacenter-specific and credentials are not portable across them: `api.loopio.com` (North America), `api.eu.loopio.com` (Europe, not yet accessible), `api.int01.loopio.com` (int01 testing instances). Use `api.loopio.com` unless told otherwise.
+- Scopes gate endpoints. Example scopes: `library:read`, `library:write`. An endpoint requires specific scopes; the token must be requested with matching scopes; the App Client must have been created with at least those scopes. Scopes cannot be changed after app creation (delete and recreate the app to change them).
+
 ## Open items to verify against the live API
 
-The Loopio developer portal (developer.loopio.com / loopio.stoplight.io) is JS-rendered and could not be read during design. The following must be confirmed against the live OpenAPI spec before tools are wired up:
+The endpoint reference (loopio.stoplight.io) is JS-rendered and could not be read during design. Confirm before wiring tools:
 
-- Exact base URL and OAuth token endpoint (working assumption: `https://api.loopio.com/data/v1/` and `https://api.loopio.com/oauth2/access_token`).
-- Token lifetime and refresh response shape.
+- Exact resource paths under the confirmed base `https://api.loopio.com/data/v2` (per-endpoint paths for library entries, stacks, categories, projects, project entries).
+- Exact scope names per endpoint beyond `library:read`/`library:write`: the Project scopes (read/write) and whether delete uses a distinct scope (e.g. `library:delete`) or falls under `library:write`.
 - The async search request/poll contract (job id, poll URL, terminal states).
 - Pagination parameters and response envelope.
 - Rate-limit headers (`Retry-After` presence) and limits.
@@ -105,7 +114,8 @@ Covered by `list_projects` and `get_project`. No dedicated tools at launch. Cros
 
 ## Auth, HTTP plumbing, error handling
 
-- Token lifecycle (`auth.ts`): on first call, POST client credentials to the token endpoint. Cache `access_token` with its `expires_in`. Refresh roughly 60 seconds before expiry. Concurrent callers awaiting a refresh share one in-flight request to avoid a token stampede.
+- Token lifecycle (`auth.ts`): on first call, POST `application/x-www-form-urlencoded` client credentials plus the requested `scope` to the token endpoint. Cache `access_token` with its `expires_in`. Refresh roughly 60 seconds before expiry. Concurrent callers awaiting a refresh share one in-flight request to avoid a token stampede.
+- Scope derivation (least privilege): the server computes the requested scopes from the enabled tiers, not the full set the App Client holds. Read-only mode requests only read scopes (e.g. `library:read` plus the Project read scope), so a read-only server can never obtain a write-capable token. `LOOPIO_ENABLE_WRITES` adds the write scopes; `LOOPIO_ENABLE_DELETES` adds the delete scope (if delete is a distinct scope; otherwise it folds into write). An optional `LOOPIO_SCOPES` env var overrides the derived set for cases where exact scope names differ from assumptions. If the App Client was not created with a requested scope, the token request fails fast with a clear message pointing at app setup.
 - HTTP wrapper (`http.ts`): injects the bearer header. On `401`, refresh once and retry. On `429`, honor `Retry-After` or use exponential backoff, up to a small retry cap. On `5xx`, retry with backoff. A hard ceiling on total retries prevents a tool call from hanging the client.
 - Async search: when a search returns the request/poll pattern (job id plus poll URL), the wrapper polls with backoff until complete or a timeout, then returns results. Claude only ever sees the final result.
 - Pagination: the domain client follows pages internally up to a configurable max-results cap (default 200). If results are truncated, the tool response says so explicitly. No silent truncation.
@@ -119,11 +129,14 @@ Environment variables, read and validated at startup:
 |----------|----------|---------|---------|
 | `LOOPIO_CLIENT_ID` | yes | none | OAuth client id |
 | `LOOPIO_CLIENT_SECRET` | yes | none | OAuth client secret |
-| `LOOPIO_BASE_URL` | no | `https://api.loopio.com/data/v1/` | API base override (region/sandbox) |
-| `LOOPIO_TOKEN_URL` | no | `https://api.loopio.com/oauth2/access_token` | Token endpoint override |
-| `LOOPIO_ENABLE_WRITES` | no | `false` | Register create/update/answer tools |
-| `LOOPIO_ENABLE_DELETES` | no | `false` | Register delete tool (ignored unless writes on) |
+| `LOOPIO_HOST` | no | `api.loopio.com` | Datacenter host; token URL and API base derive from it (`api.int01.loopio.com` for int01 testing) |
+| `LOOPIO_API_BASE_PATH` | no | `/data/v2` | API base path under the host |
+| `LOOPIO_SCOPES` | no | derived | Override the scopes requested in the token (else derived from the flags below) |
+| `LOOPIO_ENABLE_WRITES` | no | `false` | Register create/update/answer tools; add write scopes |
+| `LOOPIO_ENABLE_DELETES` | no | `false` | Register delete tool and add delete scope (ignored unless writes on) |
 | `LOOPIO_MAX_RESULTS` | no | `200` | Pagination cap |
+
+Derived URLs: token endpoint `https://{LOOPIO_HOST}/oauth2/access_token`, API base `https://{LOOPIO_HOST}{LOOPIO_API_BASE_PATH}` (default `https://api.loopio.com/data/v2`).
 
 ## Project layout
 
