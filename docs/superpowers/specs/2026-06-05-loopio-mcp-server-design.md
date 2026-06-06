@@ -34,23 +34,53 @@ A local, stdio-based Model Context Protocol (MCP) server, written in TypeScript,
 | Write safety | Read-only by default; writes opt-in via `LOOPIO_ENABLE_WRITES` |
 | Delete safety | Separate `LOOPIO_ENABLE_DELETES` flag, requires writes also on |
 
-## Confirmed from Loopio Getting Started docs
+## Confirmed against the live Loopio API spec
+
+Verified by reading the Loopio OpenAPI definition (Stoplight, project `loopio-api`, v1.0.0).
+
+Auth and hosts:
 
 - Token endpoint: `POST https://{host}/oauth2/access_token`, `Content-Type: application/x-www-form-urlencoded`, body `grant_type=client_credentials`, `scope` (space-delimited), `client_id`, `client_secret`.
 - Token response: `{ "token_type": "Bearer", "expires_in": 3600, "access_token": "..." }`. API requests carry `Authorization: Bearer {token}`.
-- Hosts are datacenter-specific and credentials are not portable across them: `api.loopio.com` (North America), `api.eu.loopio.com` (Europe, not yet accessible), `api.int01.loopio.com` (int01 testing instances). Use `api.loopio.com` unless told otherwise.
-- Scopes gate endpoints. Example scopes: `library:read`, `library:write`. An endpoint requires specific scopes; the token must be requested with matching scopes; the App Client must have been created with at least those scopes. Scopes cannot be changed after app creation (delete and recreate the app to change them).
+- OAuth security scheme is named `loopio_auth` (OAuth2, `clientCredentials` flow, token URL `/oauth2/access_token`).
+- Hosts (datacenter-specific, credentials not portable): `api.loopio.com` (North America, base `/data/v2`), `api.eu.loopio.com` (Europe, base `/data/v2`, not yet accessible), `api.int01.loopio.com` (int01 testing). A Stoplight mock server also exists at `https://stoplight.io/mocks/loopio/loopio-api/84330`.
 
-## Open items to verify against the live API
+Scopes (verified, granular):
 
-The endpoint reference (loopio.stoplight.io) is JS-rendered and could not be read during design. Confirm before wiring tools:
+- `library:read`, `library:write`, `library:delete`, `project:read`, `project:write`.
+- An endpoint requires specific scopes; the token must be requested with matching scopes; the App Client must be created with at least those scopes. Scopes cannot be changed after app creation (delete and recreate to change them).
 
-- Exact resource paths under the confirmed base `https://api.loopio.com/data/v2` (per-endpoint paths for library entries, stacks, categories, projects, project entries).
-- Exact scope names per endpoint beyond `library:read`/`library:write`: the Project scopes (read/write) and whether delete uses a distinct scope (e.g. `library:delete`) or falls under `library:write`.
-- The async search request/poll contract (job id, poll URL, terminal states).
-- Pagination parameters and response envelope.
-- Rate-limit headers (`Retry-After` presence) and limits.
-- Whether Library entries support hard delete or only archive/deactivate. If archive-only, `delete_library_entry` becomes `archive_library_entry` with the same shape and gate.
+Conventions:
+
+- Pagination: `page` and `pageSize` query parameters.
+- Async: long-running operations enqueue a task; poll `GET /asyncTasks/{taskId}` for status.
+- `inline[]` query parameter on several reads expands related data (e.g. `@mergeVariables`).
+- Errors use a documented `Error` schema. Library update is JSON Patch (`PATCH`). Project entry answer is a full `PUT`.
+
+### Tool-to-endpoint map (verified)
+
+| Tool | Method + path | Scope |
+|------|---------------|-------|
+| `search_library` | `GET /libraryEntries` (`filter`, `page`, `pageSize`) | `library:read` |
+| `get_library_entry` | `GET /libraryEntries/{id}` (`inline[]`) | `library:read` |
+| `get_library_structure` | `GET /stacks` (`fields`) returns stacks + categories + subcategories | `library:read` |
+| `list_projects` | `GET /projects` (`rfxTypes`, `owners`, `page`, `pageSize`) | `project:read` |
+| `get_project` | `GET /projects/{id}` (`fields`) | `project:read` |
+| `get_project_questions` | `GET /projectEntries` (`projectId`, `sectionId`, `subSectionId`, `inline[]`, `page`, `pageSize`) | `project:read` |
+| `get_project_status_summary` | `GET /projects/summary` (`lastUpdatedDateGt`) | `project:read` |
+| `answer_project_entry` (write) | `PUT /projectEntries/{id}` (`inline[]`) | `project:write` |
+| `create_library_entry` (write) | `POST /libraryEntries` | `library:write` |
+| `update_library_entry` (write) | `PATCH /libraryEntries/{id}` (JSON Patch) | `library:write` |
+| `delete_library_entry` (delete) | `DELETE /libraryEntries/{id}` | `library:delete` |
+
+The broader Loopio API (~60 operations: Users, Teams, Webhooks, Merge Variables, Custom Project Fields, Project Sections/SubSections, Compliance Sets, Project Templates, CRM, Roles, Files, bulk Library import) is intentionally out of scope. Each is an additive future tool, not a redesign.
+
+## Remaining items to confirm during implementation
+
+- Exact `filter` syntax for `GET /libraryEntries` (documented in the `LibrarySearchOptions` model; pull from the spec when building `search_library`).
+- Pagination response envelope (whether total counts / next markers are returned) and whether `GET /libraryEntries` ever enqueues an async task for large result sets.
+- Rate-limit headers (`Retry-After` presence) and documented limits.
+- Exact request body shape for `create_library_entry` and `update_library_entry` (from the `LibraryEntry` / `JsonPatch` models).
 
 ## Architecture
 
@@ -86,36 +116,39 @@ Principles:
 
 ## Tool catalog
 
-Approximately 10 tools, organized by domain. Read tools are always on. Write tools require `LOOPIO_ENABLE_WRITES`. Delete requires `LOOPIO_ENABLE_DELETES` (which itself requires writes on).
+Eleven tools, organized by domain (see the verified tool-to-endpoint map above for paths and scopes). Read tools are always on. Write tools require `LOOPIO_ENABLE_WRITES`. Delete requires `LOOPIO_ENABLE_DELETES` (which itself requires writes on).
 
 ### Library: search (always on)
 
-- `search_library`: keyword/filter search across Library entries. Handles async request/poll internally. Returns matched Q&A entries (question, answer, stack, category, last-reviewed date).
-- `get_library_entry`: full detail for one entry by id.
-- `list_stacks`: enumerate Library stacks for scoping searches.
-- `list_categories`: enumerate Library categories for scoping searches.
+- `search_library`: keyword/filter search across Library entries via `GET /libraryEntries`. Follows pagination internally up to the max-results cap. Returns matched Q&A entries (question, answer, stack/category location, status, last-reviewed date).
+- `get_library_entry`: full detail for one entry by id, optionally expanding merge variables via `inline[]`.
+- `get_library_structure`: the full Library structure (stacks, categories, subcategories) from `GET /stacks`, for scoping searches and for resolving location ids when creating entries.
 
 ### Projects: draft/answer (reads on, writes gated)
 
-- `list_projects`: list projects with status and dates, filterable. Also serves reporting/metadata needs.
-- `get_project`: project detail and sections.
-- `get_project_questions`: list a project's entries (questions, current answers, assignment, status).
-- `answer_project_entry` (write): set or update the response on a project entry.
+- `list_projects`: list projects, filterable by RFx type and owners.
+- `get_project`: project detail.
+- `get_project_questions`: list a project's entries (questions, current answers, assignment, status), filterable by section/subsection.
+- `answer_project_entry` (write): set or update the response on a project entry via `PUT /projectEntries/{id}`.
 
 ### Library: content management (reads on, writes/delete gated)
 
 - `create_library_entry` (write): add a new Q&A entry to a stack/category.
-- `update_library_entry` (write): edit an existing entry's question, answer, or metadata.
-- `delete_library_entry` (delete): remove a Library entry. Subject to live-API verification (hard delete vs archive).
+- `update_library_entry` (write): edit an existing entry via JSON Patch (`PATCH /libraryEntries/{id}`).
+- `delete_library_entry` (delete): hard-delete a Library entry (`DELETE /libraryEntries/{id}`, scope `library:delete`).
 
 ### Reporting/metadata (always on)
 
-Covered by `list_projects` and `get_project`. No dedicated tools at launch. Cross-project aggregates are an additive future tool, not a redesign.
+- `get_project_status_summary`: project status summaries via `GET /projects/summary`, filterable by `lastUpdatedDateGt` for sync/triage workflows. Together with `list_projects` this covers reporting without a separate analytics layer.
 
 ## Auth, HTTP plumbing, error handling
 
 - Token lifecycle (`auth.ts`): on first call, POST `application/x-www-form-urlencoded` client credentials plus the requested `scope` to the token endpoint. Cache `access_token` with its `expires_in`. Refresh roughly 60 seconds before expiry. Concurrent callers awaiting a refresh share one in-flight request to avoid a token stampede.
-- Scope derivation (least privilege): the server computes the requested scopes from the enabled tiers, not the full set the App Client holds. Read-only mode requests only read scopes (e.g. `library:read` plus the Project read scope), so a read-only server can never obtain a write-capable token. `LOOPIO_ENABLE_WRITES` adds the write scopes; `LOOPIO_ENABLE_DELETES` adds the delete scope (if delete is a distinct scope; otherwise it folds into write). An optional `LOOPIO_SCOPES` env var overrides the derived set for cases where exact scope names differ from assumptions. If the App Client was not created with a requested scope, the token request fails fast with a clear message pointing at app setup.
+- Scope derivation (least privilege): the server computes the requested scopes from the enabled tiers, not the full set the App Client holds.
+  - Read-only (default): `library:read project:read`.
+  - `LOOPIO_ENABLE_WRITES` adds: `library:write project:write`.
+  - `LOOPIO_ENABLE_DELETES` adds: `library:delete`.
+  A read-only server can never obtain a write-capable token. An optional `LOOPIO_SCOPES` env var overrides the derived set. If the App Client was not created with a requested scope, the token request fails fast with a clear message pointing at app setup.
 - HTTP wrapper (`http.ts`): injects the bearer header. On `401`, refresh once and retry. On `429`, honor `Retry-After` or use exponential backoff, up to a small retry cap. On `5xx`, retry with backoff. A hard ceiling on total retries prevents a tool call from hanging the client.
 - Async search: when a search returns the request/poll pattern (job id plus poll URL), the wrapper polls with backoff until complete or a timeout, then returns results. Claude only ever sees the final result.
 - Pagination: the domain client follows pages internally up to a configurable max-results cap (default 200). If results are truncated, the tool response says so explicitly. No silent truncation.
@@ -160,12 +193,13 @@ README documents registering the Loopio app, the env vars, and a sample MCP clie
 
 - Unit tests with mocked `fetch` for the `loopio/` client: token refresh/expiry, 401 retry, 429 backoff, async poll loop, pagination cap and truncation flag. These are the bug-prone parts and need no live API.
 - Tool-handler tests: zod schema validation (bad inputs rejected), and that write/delete tools are absent when flags are off and present when on.
-- One manual smoke check against the live API (documented in README), run with real creds, since exact endpoint contracts cannot be fully mocked until verified.
+- Optional integration check against the Loopio Stoplight mock server (`https://stoplight.io/mocks/loopio/loopio-api/84330`) by pointing `LOOPIO_HOST`/base at the mock, exercising real request/response shapes without real creds or production data.
+- One manual smoke check against the live API (documented in README), run with real creds.
 - Built test-first where it pays off (the plumbing).
 
 ## Build sequence (high level)
 
-1. Verify the live Loopio API contracts (open items above).
+1. Pull the remaining model details (`LibrarySearchOptions` filter syntax, `LibraryEntry`/`JsonPatch` request bodies, pagination envelope) from the Stoplight spec.
 2. Scaffold project, config parsing, env validation.
 3. Build and test the `loopio/` client (auth, http, library, projects).
 4. Build the `tools/` layer with conditional registration.
