@@ -1,4 +1,5 @@
 import type { LoopioConfig } from "../config.js";
+import type { Page, CappedResult } from "./types.js";
 
 export interface TokenSource {
   getToken(): Promise<string>;
@@ -111,6 +112,33 @@ export class LoopioHttpClient {
       if (res.status === 204) return undefined as T;
       return (await this.parseBody(res)) as T;
     }
+  }
+
+  async getPaged<T>(
+    path: string,
+    query: Record<string, unknown>,
+    maxResults: number,
+    pageSize = 100,
+  ): Promise<CappedResult<T>> {
+    const items: T[] = [];
+    let page = 1;
+    let totalPages = 1;
+    let totalItems = 0;
+
+    do {
+      const res = await this.request<Page<T>>("GET", path, {
+        query: { ...query, page, pageSize },
+      });
+      totalPages = res.totalPages;
+      totalItems = res.totalItems;
+      for (const item of res.items) {
+        if (items.length >= maxResults) break;
+        items.push(item);
+      }
+      page++;
+    } while (page <= totalPages && items.length < maxResults);
+
+    return { items, totalItems, truncated: items.length < totalItems };
   }
 
   private backoffMs(res: Response, attempt: number): number {

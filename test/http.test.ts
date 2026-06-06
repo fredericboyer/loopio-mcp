@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { LoopioHttpClient, LoopioError, buildQuery } from "../src/loopio/http.js";
 import type { LoopioConfig } from "../src/config.js";
+import type { Page } from "../src/loopio/types.js";
 
 const cfg = { apiBaseUrl: "https://api.loopio.com/data/v2" } as LoopioConfig;
 const tokenManager = { getToken: vi.fn().mockResolvedValue("tok") };
@@ -81,5 +82,34 @@ describe("LoopioHttpClient.request", () => {
     const fetchFn = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     const res = await client(fetchFn).request("DELETE", "/libraryEntries/1");
     expect(res).toBeUndefined();
+  });
+});
+
+describe("LoopioHttpClient.getPaged", () => {
+  function page(items: number[], totalItems: number, totalPages: number): Response {
+    return json({ items: items.map((id) => ({ id })), totalItems, totalPages } satisfies Page<{ id: number }>);
+  }
+
+  it("follows pages up to totalPages and aggregates items", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(page([1, 2], 3, 2))
+      .mockResolvedValueOnce(page([3], 3, 2));
+    const res = await client(fetchFn).getPaged<{ id: number }>("/projects", {}, 100);
+    expect(res.items.map((i) => i.id)).toEqual([1, 2, 3]);
+    expect(res.totalItems).toBe(3);
+    expect(res.truncated).toBe(false);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops and flags truncation at the cap", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(page([1, 2], 10, 5))
+      .mockResolvedValueOnce(page([3, 4], 10, 5));
+    const res = await client(fetchFn).getPaged<{ id: number }>("/projects", {}, 3);
+    expect(res.items).toHaveLength(3);
+    expect(res.truncated).toBe(true);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 });
