@@ -25,6 +25,10 @@ describe("selectTools", () => {
     const names = selectTools(defs, { enableWrites: true, enableDeletes: true }).map((d) => d.name);
     expect(names).toEqual(["read_tool", "write_tool", "delete_tool"]);
   });
+  it("does not expose delete (or write) when writes are off even if deletes on", () => {
+    const names = selectTools(defs, { enableWrites: false, enableDeletes: true }).map((d) => d.name);
+    expect(names).toEqual(["read_tool"]);
+  });
 });
 
 describe("registerTools", () => {
@@ -33,5 +37,8 @@ describe("registerTools", () => {
     registerTools(server as any, defs, { enableWrites: false, enableDeletes: false });
     expect(server.registerTool).toHaveBeenCalledTimes(1);
     expect(server.registerTool.mock.calls[0][0]).toBe("read_tool");
+    expect(server.registerTool.mock.calls[0][1]).toMatchObject({ description: "r" });
+    expect(server.registerTool.mock.calls[0][1]).toHaveProperty("inputSchema");
+    expect(typeof server.registerTool.mock.calls[0][2]).toBe("function");
   });
 });
