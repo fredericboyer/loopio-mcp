@@ -1,7 +1,7 @@
 {
   "name": "loopio-mcp",
   "version": "0.1.0",
-  "description": "Model Context Protocol (stdio) server wrapping the Loopio Data API v2.",
+  "description": "Unofficial Model Context Protocol (stdio) server for the Loopio Data API v2. Not affiliated with or endorsed by Loopio Inc.",
   "type": "module",
   "license": "MIT",
   "bin": { "loopio-mcp": "dist/server.js" },
