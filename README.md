@@ -47,6 +47,17 @@ $env:LOOPIO_API_BASE_PATH="/loopio/loopio-api/84330"; $env:LOOPIO_HOST="stopligh
 
 Note: the mock does not implement OAuth, so this only exercises request/response shapes for endpoints that the mock serves. Use the live API for end-to-end verification.
 
+## Live smoke test (read-only)
+
+With real credentials you can verify end-to-end auth and read access without writing anything:
+
+```powershell
+$env:LOOPIO_CLIENT_ID="<real>"; $env:LOOPIO_CLIENT_SECRET="<real>"
+npx tsx scripts/live-smoke.ts "security"
+```
+
+This calls `get_library_structure` and `search_library` and prints a short summary. It never creates, updates, or deletes data. A non-zero exit with a clear message indicates an auth, scope, or configuration problem.
+
 ## Development
 
 - `npm test` runs the unit tests.
