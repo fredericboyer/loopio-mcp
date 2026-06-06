@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
 import { selectTools, registerTools, type ToolDef } from "../src/tools/registry.js";
 import { libraryTools } from "../src/tools/library.js";
+import { projectTools } from "../src/tools/projects.js";
 
 const defs: ToolDef[] = [
   { name: "read_tool", tier: "read", description: "r", inputSchema: {}, handler: async () => ok("r") },
@@ -96,5 +97,45 @@ describe("libraryTools", () => {
     const res = await def.handler({ id: 9 });
     expect(res.isError).toBe(true);
     expect(res.content[0].text).toContain("404");
+  });
+});
+
+function fakeProjectsApi() {
+  return {
+    listProjects: vi.fn(),
+    getProject: vi.fn(),
+    getProjectQuestions: vi.fn(),
+    getProjectStatusSummary: vi.fn(),
+    answerProjectEntry: vi.fn(),
+  };
+}
+
+describe("projectTools", () => {
+  it("defines the five project tools with correct tiers", () => {
+    const defs = projectTools(fakeProjectsApi() as any);
+    const byName = Object.fromEntries(defs.map((d) => [d.name, d.tier]));
+    expect(byName).toEqual({
+      list_projects: "read",
+      get_project: "read",
+      get_project_questions: "read",
+      get_project_status_summary: "read",
+      answer_project_entry: "write",
+    });
+  });
+
+  it("answer_project_entry handler builds the body", async () => {
+    const api = fakeProjectsApi();
+    api.answerProjectEntry.mockResolvedValue({ id: 3 });
+    const def = projectTools(api as any).find((d) => d.name === "answer_project_entry")!;
+    await def.handler({ id: 3, answerText: "Yes, we comply." });
+    expect(api.answerProjectEntry).toHaveBeenCalledWith(3, { answer: { text: "Yes, we comply." } });
+  });
+
+  it("get_project_questions passes projectId", async () => {
+    const api = fakeProjectsApi();
+    api.getProjectQuestions.mockResolvedValue({ items: [], totalItems: 0, truncated: false });
+    const def = projectTools(api as any).find((d) => d.name === "get_project_questions")!;
+    await def.handler({ projectId: 12 });
+    expect(api.getProjectQuestions).toHaveBeenCalledWith(12, {});
   });
 });
