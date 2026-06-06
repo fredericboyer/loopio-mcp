@@ -40,7 +40,14 @@ export function loadConfig(env: Env = process.env): LoopioConfig {
     ? env.LOOPIO_SCOPES.split(/\s+/).filter(Boolean)
     : deriveScopes(enableWrites, enableDeletes);
 
-  const maxResults = env.LOOPIO_MAX_RESULTS ? Number(env.LOOPIO_MAX_RESULTS) : 200;
+  let maxResults = 200;
+  if (env.LOOPIO_MAX_RESULTS !== undefined && env.LOOPIO_MAX_RESULTS !== "") {
+    const parsed = Number(env.LOOPIO_MAX_RESULTS);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw new Error("Invalid LOOPIO_MAX_RESULTS: must be a positive integer");
+    }
+    maxResults = parsed;
+  }
 
   return {
     clientId,

@@ -52,4 +52,10 @@ describe("loadConfig", () => {
     expect(c.enableDeletes).toBe(false);
     expect(c.scopes).not.toContain("library:delete");
   });
+  it("throws on non-numeric LOOPIO_MAX_RESULTS", () => {
+    expect(() => loadConfig({ ...base, LOOPIO_MAX_RESULTS: "abc" })).toThrow(/LOOPIO_MAX_RESULTS/);
+  });
+  it("throws on zero LOOPIO_MAX_RESULTS", () => {
+    expect(() => loadConfig({ ...base, LOOPIO_MAX_RESULTS: "0" })).toThrow(/LOOPIO_MAX_RESULTS/);
+  });
 });
