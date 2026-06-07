@@ -8,7 +8,8 @@
     "loopio-mcp": "dist/server.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=18"
