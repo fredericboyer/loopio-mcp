@@ -8,7 +8,7 @@
     "loopio-mcp": "dist/server.js"
   },
   "files": [
-    "dist",
+    "dist/**/*.js",
     "CHANGELOG.md"
   ],
   "engines": {
