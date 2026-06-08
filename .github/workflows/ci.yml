@@ -32,3 +32,19 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # Single gate the branch ruleset requires. It stays green only if every
+  # build-test matrix leg succeeded, so the Node matrix can change freely
+  # without ever updating the ruleset's required checks.
+  ci-success:
+    name: CI success
+    needs: build-test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all matrix jobs passed
+        run: |
+          if [ "${{ needs.build-test.result }}" != "success" ]; then
+            echo "::error::build-test did not succeed (result: ${{ needs.build-test.result }})"
+            exit 1
+          fi
