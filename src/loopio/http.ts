@@ -118,7 +118,8 @@ export class LoopioHttpClient {
   ): Promise<CappedResult<T>> {
     const items: T[] = [];
     let page = 1;
-    let totalPages = 1;
+    // Assigned from the first response before the while-condition reads it.
+    let totalPages: number;
     let totalItems = 0;
 
     do {
