@@ -19,11 +19,13 @@ async function main(): Promise<void> {
       ? "writes"
       : "read-only";
 
-  // This server is unauthenticated and meant to sit behind an auth proxy. Writes
-  // on a non-loopback bind means a misconfigured exposure could mutate Loopio.
+  // This server is unauthenticated and meant to sit behind an auth proxy. A
+  // mutating tier (writes, or writes+deletes) on a non-loopback bind means a
+  // misconfigured exposure could change or delete Loopio data. enableDeletes
+  // implies enableWrites, so this condition covers both.
   if (config.enableWrites && httpConfig.host !== "127.0.0.1" && httpConfig.host !== "localhost") {
     console.error(
-      `WARNING: writes are enabled and bound to ${httpConfig.host} (not loopback). ` +
+      `WARNING: ${mode} enabled and bound to ${httpConfig.host} (not loopback). ` +
         "This server does not authenticate requests; ensure an auth proxy fronts it.",
     );
   }
