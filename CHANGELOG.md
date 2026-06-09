@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-09
+
+### Added
+
+- Hosted **Streamable HTTP** transport, exposed as a second binary,
+  `loopio-mcp-http`, alongside the existing stdio server. It is a stateless
+  Express server serving the MCP endpoint at `POST /mcp` and a health probe at
+  `GET /healthz`, configured via `LOOPIO_HTTP_PORT` (default `3000`),
+  `LOOPIO_HTTP_HOST` (default `0.0.0.0`), and `LOOPIO_HTTP_ALLOWED_HOSTS`. The
+  HTTP server is unauthenticated by design and is meant to run behind an
+  authenticating reverse proxy.
+- Distroless Docker image published to `ghcr.io/fredericboyer/loopio-mcp` on each
+  release (tagged with the version, `MAJOR.MINOR`, and `latest`). It runs the
+  HTTP server as a non-root user.
+
+### Changed
+
+- Standardized on Node 24 (current LTS): `engines.node` now requires `>=24`, and
+  CI runs on Node 24.
+
 ## [0.1.0] - 2026-06-07
 
 Initial release. Unofficial MCP (stdio) server for the Loopio Data API v2. Not
@@ -36,5 +56,6 @@ affiliated with or endorsed by Loopio Inc.
 - Tooling: `oxlint` and `oxfmt` (`lint` / `format` / `format:check`), and a
   vitest suite (48 tests).
 
-[Unreleased]: https://github.com/fredericboyer/loopio-mcp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/fredericboyer/loopio-mcp/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/fredericboyer/loopio-mcp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/fredericboyer/loopio-mcp/releases/tag/v0.1.0

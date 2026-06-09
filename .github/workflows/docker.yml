@@ -49,5 +49,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # ignore-error: the GHA cache backend is occasionally flaky (503); a failed
+          # cache export must not fail the build, since caching is only an optimization.
+          cache-to: type=gha,mode=max,ignore-error=true
           provenance: ${{ github.event_name == 'release' }}
