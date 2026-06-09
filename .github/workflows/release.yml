@@ -27,8 +27,9 @@ jobs:
           node-version: 24.x
           registry-url: https://registry.npmjs.org
           cache: npm
-      # Ensure npm >= 11.15.0, required for staged publishing.
-      - run: npm install -g npm@latest
+      # Pin to the npm 11 line (>= 11.15.0) that supports staged publishing.
+      # Avoid npm@latest so a future major cannot silently change the release path.
+      - run: npm install -g npm@^11.15.0
       - run: npm ci
       - run: npm test
       - name: Verify package version matches the release tag
