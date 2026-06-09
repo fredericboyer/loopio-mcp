@@ -1,0 +1,17 @@
+node_modules
+dist
+.git
+.github
+docs
+test
+scripts
+specs
+coverage
+*.log
+.gitignore
+.dockerignore
+Dockerfile
+*.md
+.vscode
+.idea
+.DS_Store
