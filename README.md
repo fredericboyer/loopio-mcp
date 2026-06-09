@@ -81,6 +81,49 @@ Then point your client at the built entry file, using an absolute path:
 
 The server requests only the OAuth scopes matching the enabled tiers, so a read-only deployment never holds write or delete scopes.
 
+## HTTP transport (`loopio-mcp-http`)
+
+In addition to the stdio server (`loopio-mcp`), this package ships a second binary, `loopio-mcp-http`, that serves the MCP **Streamable HTTP** protocol. It exposes:
+
+- `POST /mcp` — the MCP endpoint.
+- `GET /healthz` — liveness probe (returns `200 OK`).
+
+The server is stateless and unauthenticated (see the security note below).
+
+### Running the HTTP server
+
+```powershell
+$env:LOOPIO_CLIENT_ID="your-client-id"; $env:LOOPIO_CLIENT_SECRET="your-client-secret"
+npx loopio-mcp-http
+```
+
+Or from source after building:
+
+```bash
+node dist/http.js
+```
+
+### HTTP environment variables
+
+The following variables are specific to the HTTP transport. All existing Loopio variables (`LOOPIO_CLIENT_ID`, `LOOPIO_CLIENT_SECRET`, `LOOPIO_ENABLE_WRITES`, `LOOPIO_MAX_RESULTS`, etc.) apply to both transports unchanged.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOOPIO_HTTP_PORT` | `3000` | TCP port to listen on. |
+| `LOOPIO_HTTP_HOST` | `0.0.0.0` | Bind address. The default is suitable for containers; use `127.0.0.1` to restrict to loopback. |
+| `LOOPIO_HTTP_ALLOWED_HOSTS` | `127.0.0.1:<port>,localhost:<port>` | Comma-separated list of `Host` header values the server will accept. Guards against DNS-rebinding. Set this explicitly when fronting the server under a custom domain (e.g., `mcp.internal.example.com`). |
+
+### Security
+
+`loopio-mcp-http` does not authenticate requests. It is designed to run behind an authenticating reverse proxy or gateway that you operate, which terminates auth before traffic reaches the server.
+
+**Do not expose the port directly to untrusted networks.** Anyone who can reach it drives the shared Loopio service identity (the OAuth credentials the server holds).
+
+Practical guidance:
+
+- As a blast-radius control, keep hosted deployments read-only (leave `LOOPIO_ENABLE_WRITES` unset) until an auth layer is in place.
+- Any authenticating proxy works as the auth layer: oauth2-proxy, NGINX or Envoy with OIDC, Azure Container Apps or App Service built-in authentication, Azure API Management, Entra Application Proxy, or similar.
+
 ## Testing against the mock server
 
 You can exercise the tools without real credentials by pointing the base URL at Loopio's Stoplight mock:
