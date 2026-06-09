@@ -62,3 +62,30 @@ export function loadConfig(env: Env = process.env): LoopioConfig {
     maxResults,
   };
 }
+
+export interface HttpConfig {
+  port: number;
+  host: string;
+  allowedHosts: string[];
+}
+
+export function loadHttpConfig(env: Env = process.env): HttpConfig {
+  let port = 3000;
+  if (env.LOOPIO_HTTP_PORT !== undefined && env.LOOPIO_HTTP_PORT !== "") {
+    const parsed = Number(env.LOOPIO_HTTP_PORT);
+    if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 65535) {
+      throw new Error("Invalid LOOPIO_HTTP_PORT: must be a port number 1-65535");
+    }
+    port = parsed;
+  }
+
+  const host = env.LOOPIO_HTTP_HOST ?? "0.0.0.0";
+
+  const allowedHosts = env.LOOPIO_HTTP_ALLOWED_HOSTS
+    ? env.LOOPIO_HTTP_ALLOWED_HOSTS.split(",")
+        .map((h) => h.trim())
+        .filter(Boolean)
+    : [`127.0.0.1:${port}`, `localhost:${port}`];
+
+  return { port, host, allowedHosts };
+}

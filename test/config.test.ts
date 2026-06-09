@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loadConfig, deriveScopes } from "../src/config.js";
+import { loadConfig, deriveScopes, loadHttpConfig } from "../src/config.js";
 
 const base = {
   LOOPIO_CLIENT_ID: "cid",
@@ -60,5 +60,31 @@ describe("loadConfig", () => {
   });
   it("throws on zero LOOPIO_MAX_RESULTS", () => {
     expect(() => loadConfig({ ...base, LOOPIO_MAX_RESULTS: "0" })).toThrow(/LOOPIO_MAX_RESULTS/);
+  });
+});
+
+describe("loadHttpConfig", () => {
+  it("defaults to 0.0.0.0:3000 with localhost allowed hosts", () => {
+    const c = loadHttpConfig({});
+    expect(c.host).toBe("0.0.0.0");
+    expect(c.port).toBe(3000);
+    expect(c.allowedHosts).toEqual(["127.0.0.1:3000", "localhost:3000"]);
+  });
+
+  it("reads port and host from env and derives allowed hosts", () => {
+    const c = loadHttpConfig({ LOOPIO_HTTP_PORT: "8080", LOOPIO_HTTP_HOST: "127.0.0.1" });
+    expect(c.port).toBe(8080);
+    expect(c.host).toBe("127.0.0.1");
+    expect(c.allowedHosts).toEqual(["127.0.0.1:8080", "localhost:8080"]);
+  });
+
+  it("parses an explicit allowed-hosts list", () => {
+    const c = loadHttpConfig({ LOOPIO_HTTP_ALLOWED_HOSTS: "mcp.internal, mcp.internal:443" });
+    expect(c.allowedHosts).toEqual(["mcp.internal", "mcp.internal:443"]);
+  });
+
+  it("rejects an invalid port", () => {
+    expect(() => loadHttpConfig({ LOOPIO_HTTP_PORT: "0" })).toThrow(/LOOPIO_HTTP_PORT/);
+    expect(() => loadHttpConfig({ LOOPIO_HTTP_PORT: "70000" })).toThrow(/LOOPIO_HTTP_PORT/);
   });
 });
