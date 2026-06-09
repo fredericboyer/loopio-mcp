@@ -1,8 +1,12 @@
 name: Release
 
-# Distinct from CI: publishes to npm when a GitHub Release is published.
-# Flow: bump version + CHANGELOG -> commit -> create a Release tagged vX.Y.Z.
-# Requires repo secret NPM_TOKEN (an npm automation token with publish rights).
+# Distinct from CI: stages a publish to npm when a GitHub Release is published.
+# Auth is npm OIDC trusted publishing (no NPM_TOKEN secret). The trusted publisher
+# is configured stage-only, so this workflow STAGES the version; it does not go
+# public until a maintainer approves the staged package with a 2FA challenge
+# (npmjs.com "Staged Packages" tab, or `npm stage approve <stage-id>`).
+# Flow: bump version + CHANGELOG -> commit -> create a Release tagged vX.Y.Z ->
+# approve the staged version.
 
 on:
   release:
@@ -11,7 +15,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # required for npm provenance
+  id-token: write # required for npm OIDC trusted publishing
 
 jobs:
   publish:
@@ -20,9 +24,12 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          node-version: 22.x
+          node-version: 24.x
           registry-url: https://registry.npmjs.org
           cache: npm
+      # Pin to the npm 11 line (>= 11.15.0) that supports staged publishing.
+      # Avoid npm@latest so a future major cannot silently change the release path.
+      - run: npm install -g npm@^11.15.0
       - run: npm ci
       - run: npm test
       - name: Verify package version matches the release tag
@@ -34,6 +41,6 @@ jobs:
             echo "::error::package.json version ($PKG) does not match release tag ($TAG)"
             exit 1
           fi
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Stages the version via OIDC; provenance is signed automatically. A
+      # maintainer must approve the staged package with 2FA before it is public.
+      - run: npm stage publish
