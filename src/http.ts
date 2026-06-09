@@ -29,6 +29,9 @@ async function main(): Promise<void> {
   const shutdown = (signal: string) => {
     console.error(`loopio-mcp HTTP received ${signal}, shutting down`);
     server.close(() => process.exit(0));
+    // Container hygiene: if keep-alive connections keep the server open past the
+    // grace window, force exit. unref() so this timer never blocks a clean exit.
+    setTimeout(() => process.exit(1), 5_000).unref();
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
