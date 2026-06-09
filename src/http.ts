@@ -19,6 +19,15 @@ async function main(): Promise<void> {
       ? "writes"
       : "read-only";
 
+  // This server is unauthenticated and meant to sit behind an auth proxy. Writes
+  // on a non-loopback bind means a misconfigured exposure could mutate Loopio.
+  if (config.enableWrites && httpConfig.host !== "127.0.0.1" && httpConfig.host !== "localhost") {
+    console.error(
+      `WARNING: writes are enabled and bound to ${httpConfig.host} (not loopback). ` +
+        "This server does not authenticate requests; ensure an auth proxy fronts it.",
+    );
+  }
+
   const server = app.listen(httpConfig.port, httpConfig.host, () => {
     // stderr keeps stdout clean; HTTP transport does not use stdout for protocol.
     console.error(
