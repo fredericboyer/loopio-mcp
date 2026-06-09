@@ -3,6 +3,8 @@ import type { Page, CappedResult } from "./types.js";
 
 export interface TokenSource {
   getToken(): Promise<string>;
+  /** Discard any cached token; the next getToken() must fetch fresh. */
+  invalidate(): void;
 }
 
 export class LoopioError extends Error {
@@ -91,7 +93,8 @@ export class LoopioHttpClient {
 
       if (res.status === 401 && !didAuthRetry) {
         didAuthRetry = true;
-        continue; // token may be stale; getToken will refresh on next loop if needed
+        this.tokens.invalidate(); // drop the cached token; the next getToken() fetches fresh
+        continue;
       }
 
       if ((res.status === 429 || res.status >= 500) && attempt < this.maxRetries) {

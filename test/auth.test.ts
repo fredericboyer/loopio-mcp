@@ -75,4 +75,17 @@ describe("TokenManager", () => {
     const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
     await expect(tm.getToken()).rejects.toThrow(/token request failed.*401/i);
   });
+
+  it("invalidate() forces the next getToken() to fetch a new token", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse("tok1", 3600))
+      .mockResolvedValueOnce(tokenResponse("tok2", 3600));
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
+
+    expect(await tm.getToken()).toBe("tok1");
+    tm.invalidate();
+    expect(await tm.getToken()).toBe("tok2");
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
 });

@@ -41,6 +41,12 @@ export class TokenManager {
     return this.inflight;
   }
 
+  /** Drop the cached token so the next getToken() fetches a fresh one (e.g. after a 401). */
+  invalidate(): void {
+    this.token = null;
+    this.expiresAt = 0;
+  }
+
   private async fetchToken(): Promise<string> {
     const body = new URLSearchParams({
       grant_type: "client_credentials",

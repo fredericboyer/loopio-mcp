@@ -4,7 +4,7 @@ import type { LoopioConfig } from "../src/config.js";
 import type { Page } from "../src/loopio/types.js";
 
 const cfg = { apiBaseUrl: "https://api.loopio.com/data/v2" } as LoopioConfig;
-const tokenManager = { getToken: vi.fn().mockResolvedValue("tok") };
+const tokenManager = { getToken: vi.fn().mockResolvedValue("tok"), invalidate: vi.fn() };
 const noSleep = () => Promise.resolve();
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}) {
@@ -38,13 +38,29 @@ describe("LoopioHttpClient.request", () => {
     expect(init.headers.authorization).toBe("Bearer tok");
   });
 
-  it("refreshes once and retries on 401", async () => {
+  it("invalidates the cached token and retries once with a fresh token on 401", async () => {
+    const tokens = {
+      getToken: vi.fn().mockResolvedValueOnce("stale").mockResolvedValueOnce("fresh"),
+      invalidate: vi.fn(),
+    };
     const fetchFn = vi
       .fn()
       .mockResolvedValueOnce(json({ message: "expired" }, 401))
       .mockResolvedValueOnce(json({ id: 1 }));
-    const res = await client(fetchFn).request("GET", "/projects/1");
+    const c = new LoopioHttpClient(cfg, tokens, { fetchFn, sleep: noSleep, maxRetries: 3 });
+
+    const res = await c.request("GET", "/projects/1");
     expect(res).toEqual({ id: 1 });
+    expect(tokens.invalidate).toHaveBeenCalledTimes(1);
+    expect(fetchFn.mock.calls[1][1].headers.authorization).toBe("Bearer fresh");
+  });
+
+  it("does not retry a second consecutive 401", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(json({ message: "nope" }, 401));
+    await expect(client(fetchFn).request("GET", "/projects/1")).rejects.toMatchObject({
+      name: "LoopioError",
+      status: 401,
+    });
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
