@@ -94,8 +94,11 @@ The server is stateless and unauthenticated (see the security note below).
 
 ```powershell
 $env:LOOPIO_CLIENT_ID="your-client-id"; $env:LOOPIO_CLIENT_SECRET="your-client-secret"
-npx loopio-mcp-http
+# loopio-mcp-http is a bin inside the loopio-mcp package, so name the package explicitly:
+npx --package loopio-mcp loopio-mcp-http
 ```
+
+(If `loopio-mcp` is installed globally, run `loopio-mcp-http` directly.)
 
 Or from source after building:
 
