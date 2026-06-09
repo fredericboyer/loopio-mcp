@@ -85,8 +85,8 @@ The server requests only the OAuth scopes matching the enabled tiers, so a read-
 
 In addition to the stdio server (`loopio-mcp`), this package ships a second binary, `loopio-mcp-http`, that serves the MCP **Streamable HTTP** protocol. It exposes:
 
-- `POST /mcp` — the MCP endpoint.
-- `GET /healthz` — liveness probe (returns `200 OK`).
+- `POST /mcp`: the MCP endpoint.
+- `GET /healthz`: liveness probe (returns `200 OK`).
 
 The server is stateless and unauthenticated (see the security note below).
 
