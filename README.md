@@ -127,6 +127,42 @@ Practical guidance:
 - As a blast-radius control, keep hosted deployments read-only (leave `LOOPIO_ENABLE_WRITES` unset) until an auth layer is in place.
 - Any authenticating proxy works as the auth layer: oauth2-proxy, NGINX or Envoy with OIDC, Azure Container Apps or App Service built-in authentication, Azure API Management, Entra Application Proxy, or similar.
 
+## Docker image (`ghcr.io/fredericboyer/loopio-mcp`)
+
+The project ships a small distroless container image that runs `loopio-mcp-http`. It is published to `ghcr.io/fredericboyer/loopio-mcp` on each GitHub Release, tagged with the version, `MAJOR.MINOR`, and `latest`.
+
+### Pull and run
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e LOOPIO_CLIENT_ID=... \
+  -e LOOPIO_CLIENT_SECRET=... \
+  ghcr.io/fredericboyer/loopio-mcp:latest
+```
+
+This starts the same unauthenticated HTTP server described in the security note above. Run it behind your authenticating proxy, and keep it read-only (leave `LOOPIO_ENABLE_WRITES` unset) until that layer is in place. All HTTP env vars (`LOOPIO_HTTP_PORT`, `LOOPIO_HTTP_HOST`, `LOOPIO_HTTP_ALLOWED_HOSTS`) and Loopio env vars apply unchanged.
+
+### Health probes
+
+The image exposes `GET /healthz` but has no built-in `HEALTHCHECK` instruction. Wire it up at the orchestrator level. Kubernetes example:
+
+```yaml
+readinessProbe:
+  httpGet: { path: /healthz, port: 3000 }
+livenessProbe:
+  httpGet: { path: /healthz, port: 3000 }
+```
+
+### Build locally
+
+```bash
+docker build -t loopio-mcp .
+```
+
+### Package visibility
+
+The GHCR package may be private on first publish. To allow unauthenticated pulls, open the package settings on GitHub and set visibility to public.
+
 ## Testing against the mock server
 
 You can exercise the tools without real credentials by pointing the base URL at Loopio's Stoplight mock:
