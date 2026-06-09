@@ -13,7 +13,8 @@
   },
   "homepage": "https://github.com/fredericboyer/loopio-mcp#readme",
   "bin": {
-    "loopio-mcp": "dist/server.js"
+    "loopio-mcp": "dist/server.js",
+    "loopio-mcp-http": "dist/http.js"
   },
   "files": [
     "dist/**/*.js",
