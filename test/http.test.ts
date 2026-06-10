@@ -106,6 +106,28 @@ describe("LoopioHttpClient.request", () => {
     const [, init] = fetchFn.mock.calls[0];
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
+
+  it("clamps a large Retry-After to 30s", async () => {
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(json({}, 429, { "retry-after": "3600" }))
+      .mockResolvedValueOnce(json({ ok: true }));
+    const c = new LoopioHttpClient(cfg, tokenManager as any, { fetchFn, sleep, maxRetries: 3 });
+    await c.request("GET", "/projects");
+    expect(sleep).toHaveBeenCalledWith(30_000);
+  });
+
+  it("ignores a negative Retry-After and uses exponential backoff", async () => {
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(json({}, 429, { "retry-after": "-5" }))
+      .mockResolvedValueOnce(json({ ok: true }));
+    const c = new LoopioHttpClient(cfg, tokenManager as any, { fetchFn, sleep, maxRetries: 3 });
+    await c.request("GET", "/projects");
+    expect(sleep).toHaveBeenCalledWith(1000);
+  });
 });
 
 describe("LoopioHttpClient.getPaged", () => {

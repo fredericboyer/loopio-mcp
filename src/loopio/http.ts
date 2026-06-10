@@ -59,6 +59,7 @@ export interface RequestOptions {
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const MAX_RETRY_AFTER_MS = 30_000;
 
 export class LoopioHttpClient {
   private fetchFn: typeof fetch;
@@ -154,7 +155,9 @@ export class LoopioHttpClient {
     const retryAfter = res.headers.get("retry-after");
     if (retryAfter) {
       const secs = Number(retryAfter);
-      if (!Number.isNaN(secs)) return secs * 1000;
+      if (!Number.isNaN(secs) && secs >= 0) {
+        return Math.min(secs * 1000, MAX_RETRY_AFTER_MS);
+      }
     }
     return Math.min(1000 * 2 ** (attempt - 1), 8000);
   }
