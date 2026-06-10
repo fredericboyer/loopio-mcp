@@ -107,4 +107,21 @@ describe("TokenManager", () => {
     const [, init] = fetchFn.mock.calls[0];
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
+
+  it("honors a custom timeoutMs by rejecting with a TimeoutError", async () => {
+    const fetchFn = vi.fn().mockImplementation(
+      (_url: string, init: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener("abort", () => reject(init.signal.reason));
+        }),
+    );
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0, timeoutMs: 5 });
+    await expect(tm.getToken()).rejects.toMatchObject({ name: "TimeoutError" });
+  });
+
+  it("rejects a token response that is not JSON", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response("<html>502</html>", { status: 200 }));
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
+    await expect(tm.getToken()).rejects.toThrow(/token response/i);
+  });
 });

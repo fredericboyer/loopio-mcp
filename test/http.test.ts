@@ -128,6 +128,32 @@ describe("LoopioHttpClient.request", () => {
     await c.request("GET", "/projects");
     expect(sleep).toHaveBeenCalledWith(1000);
   });
+
+  it("honors a custom timeoutMs by rejecting with a TimeoutError", async () => {
+    const fetchFn = vi.fn().mockImplementation(
+      (_url: string, init: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener("abort", () => reject(init.signal.reason));
+        }),
+    );
+    const c = new LoopioHttpClient(cfg, tokenManager as any, {
+      fetchFn,
+      sleep: noSleep,
+      timeoutMs: 5,
+    });
+    await expect(c.request("GET", "/projects")).rejects.toMatchObject({ name: "TimeoutError" });
+  });
+
+  it("treats Retry-After: 0 as an immediate retry", async () => {
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(json({}, 429, { "retry-after": "0" }))
+      .mockResolvedValueOnce(json({ ok: true }));
+    const c = new LoopioHttpClient(cfg, tokenManager as any, { fetchFn, sleep, maxRetries: 3 });
+    await c.request("GET", "/projects");
+    expect(sleep).toHaveBeenCalledWith(0);
+  });
 });
 
 describe("LoopioHttpClient.getPaged", () => {
