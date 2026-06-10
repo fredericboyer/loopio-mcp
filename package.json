@@ -1,6 +1,6 @@
 {
   "name": "loopio-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Unofficial Model Context Protocol server (stdio and HTTP) for the Loopio Data API v2. Not affiliated with or endorsed by Loopio Inc.",
   "type": "module",
   "license": "MIT",

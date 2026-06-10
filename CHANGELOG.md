@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-09
+
+### Fixed
+
+- A 401 from the Loopio API now invalidates the cached OAuth token before the
+  single retry, so the retry carries a freshly fetched token. Previously the
+  retry re-sent the same cached token, making the retry a no-op (e.g. after a
+  credential rotation, calls kept failing until the cached token expired).
+- The OAuth token response is now validated; a malformed response fails loudly
+  instead of silently degrading into refetching the token on every request.
+- `Retry-After` values from the API are clamped to 30 seconds (negative values
+  fall back to exponential backoff), so a pathological header can no longer
+  block a tool call for an arbitrary time.
+
+### Changed
+
+- All outbound requests (token and API) now carry a 30-second timeout, so a
+  hung endpoint can no longer block an MCP tool call indefinitely.
+- Tool handler argument types are now inferred from their zod schemas
+  (internal refactor; tool names, descriptions, and schemas are unchanged).
+- CI: manual `workflow_dispatch` of the release workflow now performs a
+  `npm publish --dry-run` rehearsal instead of staging; staging only happens
+  for real releases. The Docker workflow grants `packages: write` only to the
+  release-time publish job; PR builds run with a read-only token.
+
 ## [0.2.0] - 2026-06-09
 
 ### Added
@@ -56,6 +81,7 @@ affiliated with or endorsed by Loopio Inc.
 - Tooling: `oxlint` and `oxfmt` (`lint` / `format` / `format:check`), and a
   vitest suite (48 tests).
 
-[Unreleased]: https://github.com/fredericboyer/loopio-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/fredericboyer/loopio-mcp/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/fredericboyer/loopio-mcp/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/fredericboyer/loopio-mcp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/fredericboyer/loopio-mcp/releases/tag/v0.1.0
