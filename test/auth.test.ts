@@ -99,4 +99,12 @@ describe("TokenManager", () => {
     const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
     await expect(tm.getToken()).rejects.toThrow(/token response/i);
   });
+
+  it("attaches a timeout signal to the token request", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(tokenResponse("tok1"));
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
+    await tm.getToken();
+    const [, init] = fetchFn.mock.calls[0];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
 });

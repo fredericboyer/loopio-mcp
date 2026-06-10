@@ -99,6 +99,13 @@ describe("LoopioHttpClient.request", () => {
     const res = await client(fetchFn).request("DELETE", "/libraryEntries/1");
     expect(res).toBeUndefined();
   });
+
+  it("attaches a timeout signal to API requests", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(json({ id: 1 }));
+    await client(fetchFn).request("GET", "/projects/1");
+    const [, init] = fetchFn.mock.calls[0];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
 });
 
 describe("LoopioHttpClient.getPaged", () => {

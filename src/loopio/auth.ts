@@ -11,12 +11,15 @@ export interface TokenManagerOptions {
   now?: () => number;
   /** Refresh this many ms before the token actually expires. */
   refreshSkewMs?: number;
+  /** Abort the token request after this many ms. Default 30s. */
+  timeoutMs?: number;
 }
 
 export class TokenManager {
   private fetchFn: typeof fetch;
   private now: () => number;
   private skew: number;
+  private timeoutMs: number;
   private token: string | null = null;
   private expiresAt = 0;
   private inflight: Promise<string> | null = null;
@@ -28,6 +31,7 @@ export class TokenManager {
     this.fetchFn = opts.fetchFn ?? fetch;
     this.now = opts.now ?? (() => Date.now());
     this.skew = opts.refreshSkewMs ?? 60_000;
+    this.timeoutMs = opts.timeoutMs ?? 30_000;
   }
 
   async getToken(): Promise<string> {
@@ -59,6 +63,7 @@ export class TokenManager {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: body.toString(),
+      signal: AbortSignal.timeout(this.timeoutMs),
     });
 
     if (!res.ok) {

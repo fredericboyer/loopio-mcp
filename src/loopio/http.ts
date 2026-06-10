@@ -48,6 +48,8 @@ export interface HttpClientOptions {
   fetchFn?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   maxRetries?: number;
+  /** Abort each API request after this many ms. Default 30s. */
+  timeoutMs?: number;
 }
 
 export interface RequestOptions {
@@ -62,6 +64,7 @@ export class LoopioHttpClient {
   private fetchFn: typeof fetch;
   private sleep: (ms: number) => Promise<void>;
   private maxRetries: number;
+  private timeoutMs: number;
 
   constructor(
     private cfg: LoopioConfig,
@@ -71,6 +74,7 @@ export class LoopioHttpClient {
     this.fetchFn = opts.fetchFn ?? fetch;
     this.sleep = opts.sleep ?? defaultSleep;
     this.maxRetries = opts.maxRetries ?? 3;
+    this.timeoutMs = opts.timeoutMs ?? 30_000;
   }
 
   async request<T = unknown>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
@@ -89,7 +93,12 @@ export class LoopioHttpClient {
         body = JSON.stringify(opts.body);
       }
 
-      const res = await this.fetchFn(url, { method, headers, body });
+      const res = await this.fetchFn(url, {
+        method,
+        headers,
+        body,
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
 
       if (res.status === 401 && !didAuthRetry) {
         didAuthRetry = true;
