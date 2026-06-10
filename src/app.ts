@@ -24,7 +24,7 @@ export function createDeps(config: LoopioConfig): Deps {
 
 /** Build a configured McpServer. Cheap; call once for stdio, once per HTTP request. */
 export function buildMcpServer(deps: Deps, config: LoopioConfig): McpServer {
-  const server = new McpServer({ name: "loopio-mcp", version: "0.2.0" });
+  const server = new McpServer({ name: "loopio-mcp", version: "0.2.1" });
   const defs = [...libraryTools(deps.library), ...projectTools(deps.projects)];
   registerTools(server, defs, {
     enableWrites: config.enableWrites,
