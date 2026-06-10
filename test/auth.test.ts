@@ -88,4 +88,15 @@ describe("TokenManager", () => {
     expect(await tm.getToken()).toBe("tok2");
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
+
+  it("rejects a token response that is not in the expected shape", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ weird: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
+    await expect(tm.getToken()).rejects.toThrow(/token response/i);
+  });
 });

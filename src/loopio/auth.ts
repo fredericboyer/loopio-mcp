@@ -1,10 +1,10 @@
+import { z } from "zod";
 import type { LoopioConfig } from "../config.js";
 
-interface TokenResponse {
-  token_type: string;
-  expires_in: number;
-  access_token: string;
-}
+const tokenResponseSchema = z.object({
+  access_token: z.string().min(1),
+  expires_in: z.number().positive(),
+});
 
 export interface TokenManagerOptions {
   fetchFn?: typeof fetch;
@@ -66,9 +66,14 @@ export class TokenManager {
       throw new Error(`Loopio token request failed (${res.status}): ${text.slice(0, 200)}`);
     }
 
-    const json = (await res.json()) as TokenResponse;
-    this.token = json.access_token;
-    this.expiresAt = this.now() + json.expires_in * 1000;
+    const parsed = tokenResponseSchema.safeParse(await res.json().catch(() => undefined));
+    if (!parsed.success) {
+      throw new Error(
+        "Loopio token response did not match the expected shape (access_token, expires_in)",
+      );
+    }
+    this.token = parsed.data.access_token;
+    this.expiresAt = this.now() + parsed.data.expires_in * 1000;
     return this.token;
   }
 }
