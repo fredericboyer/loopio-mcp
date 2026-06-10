@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI: merging a release PR to `main` now automatically creates the GitHub
+  Release (tag plus notes extracted from this file) and runs the npm staging
+  and Docker GHCR publishes in the same pipeline; manually published releases
+  still publish as a fallback. The Docker workflow now only builds on PRs.
+
 ## [0.2.1] - 2026-06-09
 
 ### Fixed

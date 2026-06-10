@@ -1,25 +1,105 @@
 name: Release
 
-# Distinct from CI: stages a publish to npm when a GitHub Release is published.
-# Auth is npm OIDC trusted publishing (no NPM_TOKEN secret). The trusted publisher
-# is configured stage-only, so this workflow STAGES the version; it does not go
-# public until a maintainer approves the staged package with a 2FA challenge
-# (npmjs.com "Staged Packages" tab, or `npm stage approve <stage-id>`).
-# Flow: bump version + CHANGELOG -> commit -> create a Release tagged vX.Y.Z ->
-# approve the staged version.
+# The release pipeline. On every push to main it checks whether package.json's
+# version already has a v<version> tag; if not (a release PR just merged), it
+# creates the GitHub Release with notes from CHANGELOG.md and then publishes:
+# - npm: stages the version via OIDC trusted publishing (no NPM_TOKEN secret).
+#   The trusted publisher is configured stage-only, so the version is NOT
+#   public until a maintainer approves the staged package with a 2FA challenge
+#   (npmjs.com "Staged Packages" tab, or `npm stage approve <stage-id>`).
+# - Docker: builds and pushes the image to GHCR.
+#
+# The publish jobs run inside this workflow rather than on the release event
+# because releases created with GITHUB_TOKEN do not trigger other workflows
+# (GitHub's anti-recursion rule). `release: published` is kept as a fallback:
+# a manually created release still publishes. workflow_dispatch is a
+# rehearsal (npm pack dry-run only, nothing is staged or pushed).
+#
+# Flow: merge the release PR (version bump + CHANGELOG section) -> this
+# pipeline creates the Release and publishes -> approve the staged npm
+# version with 2FA.
 
 on:
+  push:
+    branches: [main]
   release:
     types: [published]
   workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write # required for npm OIDC trusted publishing
+
+# Serialize runs so two rapid merges to main cannot race on tag creation.
+# No cancel-in-progress: never interrupt a publish mid-flight.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  publish:
+  # Decides whether this push is a release: a version bump with no tag yet.
+  check:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should-release: ${{ steps.version.outputs.should-release }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - id: version
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            echo "should-release=false" >> "$GITHUB_OUTPUT"
+            echo "Tag v$VERSION already exists; nothing to release."
+          else
+            echo "should-release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Creates the vX.Y.Z tag and GitHub Release with notes from CHANGELOG.md.
+  # The only job with write access to repo contents.
+  create-release:
+    needs: check
+    if: needs.check.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Create release with CHANGELOG notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          # Invoke via bash: the exec bit is not reliably set for files
+          # committed from Windows.
+          bash scripts/release-notes.sh "$VERSION" > /tmp/notes.md
+          PRERELEASE=""
+          case "$VERSION" in *-*) PRERELEASE="--prerelease" ;; esac
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes-file /tmp/notes.md \
+            $PRERELEASE
+
+  # Stages the npm version via OIDC; provenance is signed automatically. A
+  # maintainer must approve the staged package with 2FA before it is public.
+  publish-npm:
+    needs: [check, create-release]
+    # Three entry paths: after create-release (auto), on a manually published
+    # release (fallback), or as a workflow_dispatch rehearsal. !cancelled()
+    # lets the fallback paths run even though check/create-release are
+    # skipped for non-push events.
+    if: >-
+      !cancelled() && (
+        needs.create-release.result == 'success' ||
+        github.event_name == 'release' ||
+        github.event_name == 'workflow_dispatch'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm OIDC trusted publishing
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -41,11 +121,65 @@ jobs:
             echo "::error::package.json version ($PKG) does not match release tag ($TAG)"
             exit 1
           fi
-      # Stages the version via OIDC; provenance is signed automatically. A
-      # maintainer must approve the staged package with 2FA before it is public.
-      # Staging only happens for real releases; the version check above has run.
+      # On the push path the version came from package.json, so no tag/version
+      # mismatch is possible.
       - run: npm stage publish
-        if: github.event_name == 'release'
+        if: github.event_name != 'workflow_dispatch'
       # workflow_dispatch is a rehearsal: validate packing without staging anything.
       - run: npm publish --dry-run
         if: github.event_name == 'workflow_dispatch'
+
+  # Builds and pushes the image to GHCR. The only job that can write packages.
+  publish-docker:
+    needs: [check, create-release]
+    if: >-
+      !cancelled() && (
+        needs.create-release.result == 'success' ||
+        github.event_name == 'release'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve version
+        id: version
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.event.release.tag_name }}
+          PUSH_VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          if [ "$EVENT" = "release" ]; then
+            VERSION="${TAG#v}"
+          else
+            VERSION="$PUSH_VERSION"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Compute image metadata
+        id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        with:
+          images: ghcr.io/fredericboyer/loopio-mcp
+          # `latest` tags stable releases only; prereleases carry a hyphen.
+          tags: |
+            type=semver,pattern={{version}},value=v${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.version.outputs.version }}
+            type=raw,value=latest,enable=${{ !contains(steps.version.outputs.version, '-') }}
+      - name: Build and push
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
+          provenance: true
