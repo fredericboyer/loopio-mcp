@@ -1,7 +1,8 @@
 name: Docker
 
-# Builds the loopio-mcp-http image. Builds on PRs (no push) to catch Dockerfile
-# regressions; builds and pushes a tagged image to GHCR on each GitHub Release.
+# Builds the loopio-mcp-http image. Builds on PRs (no push, no write grants) to
+# catch Dockerfile regressions; builds and pushes a tagged image to GHCR on each
+# GitHub Release.
 
 on:
   pull_request:
@@ -12,20 +13,40 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: docker-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  image:
+  # PR / manual rehearsal: build only, token stays read-only.
+  build:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+      - name: Build (no push)
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          # ignore-error: the GHA cache backend is occasionally flaky (503); a failed
+          # cache export must not fail the build, since caching is only an optimization.
+          cache-to: type=gha,mode=max,ignore-error=true
+
+  # Release: the only job that can write to GHCR.
+  publish:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
       - name: Log in to GHCR
-        if: github.event_name == 'release'
         uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ghcr.io
@@ -45,11 +66,9 @@ jobs:
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
-          push: ${{ github.event_name == 'release' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          # ignore-error: the GHA cache backend is occasionally flaky (503); a failed
-          # cache export must not fail the build, since caching is only an optimization.
           cache-to: type=gha,mode=max,ignore-error=true
-          provenance: ${{ github.event_name == 'release' }}
+          provenance: true

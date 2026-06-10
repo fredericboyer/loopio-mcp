@@ -43,4 +43,9 @@ jobs:
           fi
       # Stages the version via OIDC; provenance is signed automatically. A
       # maintainer must approve the staged package with 2FA before it is public.
+      # Staging only happens for real releases; the version check above has run.
       - run: npm stage publish
+        if: github.event_name == 'release'
+      # workflow_dispatch is a rehearsal: validate packing without staging anything.
+      - run: npm publish --dry-run
+        if: github.event_name == 'workflow_dispatch'

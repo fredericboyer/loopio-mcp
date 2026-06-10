@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { LibraryApi } from "../loopio/library.js";
-import type { ToolDef } from "./registry.js";
+import { defineTool, type ToolDef } from "./registry.js";
 import { guard, jsonResult, textResult } from "./result.js";
 
 const locationSchema = z.object({
@@ -11,7 +11,7 @@ const locationSchema = z.object({
 
 export function libraryTools(api: LibraryApi): ToolDef[] {
   return [
-    {
+    defineTool({
       name: "search_library",
       tier: "read",
       description:
@@ -45,8 +45,8 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
             items: result.items,
           });
         }),
-    },
-    {
+    }),
+    defineTool({
       name: "get_library_entry",
       tier: "read",
       description: "Get the full detail of one Library entry by id.",
@@ -60,18 +60,18 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
       handler: (args) =>
         guard(async () => {
           const inline = args.expandMergeVariables ? ["@mergeVariables"] : undefined;
-          return jsonResult(await api.getLibraryEntry(args.id as number, inline));
+          return jsonResult(await api.getLibraryEntry(args.id, inline));
         }),
-    },
-    {
+    }),
+    defineTool({
       name: "get_library_structure",
       tier: "read",
       description:
         "List the full Library structure (stacks, categories, subcategories) for scoping searches and resolving location ids.",
       inputSchema: {},
       handler: () => guard(async () => jsonResult(await api.getLibraryStructure())),
-    },
-    {
+    }),
+    defineTool({
       name: "create_library_entry",
       tier: "write",
       description: "Create a new Library Q&A entry in a stack/category.",
@@ -88,16 +88,16 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
       handler: (args) =>
         guard(async () => {
           const created = await api.createLibraryEntry({
-            questions: args.questions as { text: string }[],
-            answer: { text: args.answerText as string },
-            location: args.location as { stackID: number },
-            languageCode: args.languageCode as never,
-            tags: args.tags as string[] | undefined,
+            questions: args.questions,
+            answer: { text: args.answerText },
+            location: args.location,
+            languageCode: args.languageCode,
+            tags: args.tags,
           });
           return jsonResult(created);
         }),
-    },
-    {
+    }),
+    defineTool({
       name: "update_library_entry",
       tier: "write",
       description:
@@ -117,20 +117,18 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
           .min(1),
       },
       handler: (args) =>
-        guard(async () =>
-          jsonResult(await api.updateLibraryEntry(args.id as number, args.patch as never)),
-        ),
-    },
-    {
+        guard(async () => jsonResult(await api.updateLibraryEntry(args.id, args.patch))),
+    }),
+    defineTool({
       name: "delete_library_entry",
       tier: "delete",
       description: "Permanently delete a Library entry. Irreversible.",
       inputSchema: { id: z.number() },
       handler: (args) =>
         guard(async () => {
-          await api.deleteLibraryEntry(args.id as number);
+          await api.deleteLibraryEntry(args.id);
           return textResult(`Library entry ${args.id} deleted.`);
         }),
-    },
+    }),
   ];
 }

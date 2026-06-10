@@ -3,6 +3,8 @@ import type { Page, CappedResult } from "./types.js";
 
 export interface TokenSource {
   getToken(): Promise<string>;
+  /** Discard any cached token; the next getToken() must fetch fresh. */
+  invalidate(): void;
 }
 
 export class LoopioError extends Error {
@@ -46,6 +48,8 @@ export interface HttpClientOptions {
   fetchFn?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   maxRetries?: number;
+  /** Abort each API request after this many ms. Default 30s. */
+  timeoutMs?: number;
 }
 
 export interface RequestOptions {
@@ -55,11 +59,13 @@ export interface RequestOptions {
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const MAX_RETRY_AFTER_MS = 30_000;
 
 export class LoopioHttpClient {
   private fetchFn: typeof fetch;
   private sleep: (ms: number) => Promise<void>;
   private maxRetries: number;
+  private timeoutMs: number;
 
   constructor(
     private cfg: LoopioConfig,
@@ -69,6 +75,7 @@ export class LoopioHttpClient {
     this.fetchFn = opts.fetchFn ?? fetch;
     this.sleep = opts.sleep ?? defaultSleep;
     this.maxRetries = opts.maxRetries ?? 3;
+    this.timeoutMs = opts.timeoutMs ?? 30_000;
   }
 
   async request<T = unknown>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
@@ -87,11 +94,17 @@ export class LoopioHttpClient {
         body = JSON.stringify(opts.body);
       }
 
-      const res = await this.fetchFn(url, { method, headers, body });
+      const res = await this.fetchFn(url, {
+        method,
+        headers,
+        body,
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
 
       if (res.status === 401 && !didAuthRetry) {
         didAuthRetry = true;
-        continue; // token may be stale; getToken will refresh on next loop if needed
+        this.tokens.invalidate(); // drop the cached token; the next getToken() fetches fresh
+        continue;
       }
 
       if ((res.status === 429 || res.status >= 500) && attempt < this.maxRetries) {
@@ -142,7 +155,9 @@ export class LoopioHttpClient {
     const retryAfter = res.headers.get("retry-after");
     if (retryAfter) {
       const secs = Number(retryAfter);
-      if (!Number.isNaN(secs)) return secs * 1000;
+      if (!Number.isNaN(secs) && secs >= 0) {
+        return Math.min(secs * 1000, MAX_RETRY_AFTER_MS);
+      }
     }
     return Math.min(1000 * 2 ** (attempt - 1), 8000);
   }

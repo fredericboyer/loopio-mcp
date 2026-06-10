@@ -75,4 +75,53 @@ describe("TokenManager", () => {
     const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
     await expect(tm.getToken()).rejects.toThrow(/token request failed.*401/i);
   });
+
+  it("invalidate() forces the next getToken() to fetch a new token", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse("tok1", 3600))
+      .mockResolvedValueOnce(tokenResponse("tok2", 3600));
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
+
+    expect(await tm.getToken()).toBe("tok1");
+    tm.invalidate();
+    expect(await tm.getToken()).toBe("tok2");
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a token response that is not in the expected shape", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ weird: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
+    await expect(tm.getToken()).rejects.toThrow(/token response/i);
+  });
+
+  it("attaches a timeout signal to the token request", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(tokenResponse("tok1"));
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
+    await tm.getToken();
+    const [, init] = fetchFn.mock.calls[0];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("honors a custom timeoutMs by rejecting with a TimeoutError", async () => {
+    const fetchFn = vi.fn().mockImplementation(
+      (_url: string, init: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener("abort", () => reject(init.signal.reason));
+        }),
+    );
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0, timeoutMs: 5 });
+    await expect(tm.getToken()).rejects.toMatchObject({ name: "TimeoutError" });
+  });
+
+  it("rejects a token response that is not JSON", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response("<html>502</html>", { status: 200 }));
+    const tm = new TokenManager(cfg, { fetchFn, now: () => 0 });
+    await expect(tm.getToken()).rejects.toThrow(/token response/i);
+  });
 });

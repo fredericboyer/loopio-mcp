@@ -1,11 +1,11 @@
 import { z } from "zod";
 import type { ProjectsApi } from "../loopio/projects.js";
-import type { ToolDef } from "./registry.js";
+import { defineTool, type ToolDef } from "./registry.js";
 import { guard, jsonResult } from "./result.js";
 
 export function projectTools(api: ProjectsApi): ToolDef[] {
   return [
-    {
+    defineTool({
       name: "list_projects",
       tier: "read",
       description: "List Loopio projects, optionally filtered by RFx type and owner ids.",
@@ -23,15 +23,15 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
             items: result.items,
           });
         }),
-    },
-    {
+    }),
+    defineTool({
       name: "get_project",
       tier: "read",
       description: "Get a project's data by id.",
       inputSchema: { id: z.number() },
-      handler: (args) => guard(async () => jsonResult(await api.getProject(args.id as number))),
-    },
-    {
+      handler: (args) => guard(async () => jsonResult(await api.getProject(args.id))),
+    }),
+    defineTool({
       name: "get_project_questions",
       tier: "read",
       description:
@@ -43,11 +43,7 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
       },
       handler: (args) =>
         guard(async () => {
-          const { projectId, ...rest } = args as {
-            projectId: number;
-            sectionId?: number;
-            subSectionId?: number;
-          };
+          const { projectId, ...rest } = args;
           const result = await api.getProjectQuestions(projectId, rest);
           return jsonResult({
             totalItems: result.totalItems,
@@ -56,8 +52,8 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
             items: result.items,
           });
         }),
-    },
-    {
+    }),
+    defineTool({
       name: "get_project_status_summary",
       tier: "read",
       description:
@@ -66,11 +62,9 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
         lastUpdatedDateGt: z.string().describe("ISO-8601 timestamp, e.g. 2026-01-01T00:00:00Z"),
       },
       handler: (args) =>
-        guard(async () =>
-          jsonResult(await api.getProjectStatusSummary(args.lastUpdatedDateGt as string)),
-        ),
-    },
-    {
+        guard(async () => jsonResult(await api.getProjectStatusSummary(args.lastUpdatedDateGt))),
+    }),
+    defineTool({
       name: "answer_project_entry",
       tier: "write",
       description:
@@ -83,11 +77,11 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
       handler: (args) =>
         guard(async () => {
           const body: { question?: string; answer: { text: string } } = {
-            answer: { text: args.answerText as string },
+            answer: { text: args.answerText },
           };
-          if (args.question !== undefined) body.question = args.question as string;
-          return jsonResult(await api.answerProjectEntry(args.id as number, body));
+          if (args.question !== undefined) body.question = args.question;
+          return jsonResult(await api.answerProjectEntry(args.id, body));
         }),
-    },
+    }),
   ];
 }
