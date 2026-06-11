@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A Claude Code plugin (`/plugin marketplace add fredericboyer/loopio-mcp`,
+  then `/plugin install loopio@loopio-mcp`) that installs the MCP server
+  config and a Loopio skill covering RFP answering, library search, and
+  curation workflows. The skill also works standalone: copy
+  `plugin/skills/loopio/` into `~/.claude/skills/`. The plugin ships from
+  the repo and is versioned independently of the npm package.
+
 ### Changed
 
 - CI: merging a release PR to `main` now automatically creates the GitHub

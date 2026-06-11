@@ -1,0 +1,15 @@
+{
+  "name": "loopio-mcp",
+  "owner": {
+    "name": "Frédéric Boyer"
+  },
+  "description": "Plugin marketplace for loopio-mcp, an unofficial MCP server for the Loopio Data API v2",
+  "plugins": [
+    {
+      "name": "loopio",
+      "source": "./plugin",
+      "description": "Installs the loopio-mcp server (npx) and a skill teaching Loopio RFP answering, library search, and curation workflows",
+      "category": "productivity"
+    }
+  ]
+}
