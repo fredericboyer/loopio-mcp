@@ -1,0 +1,12 @@
+{
+  "name": "loopio",
+  "version": "0.1.0",
+  "description": "Loopio for Claude: installs the loopio-mcp server (Loopio Data API v2) and a skill teaching RFP answering, library search, and curation workflows",
+  "author": {
+    "name": "Frédéric Boyer"
+  },
+  "homepage": "https://github.com/fredericboyer/loopio-mcp#readme",
+  "repository": "https://github.com/fredericboyer/loopio-mcp",
+  "license": "MIT",
+  "keywords": ["loopio", "rfp", "rfi", "ddq", "security-questionnaire", "mcp"]
+}
