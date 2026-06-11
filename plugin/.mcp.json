@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "loopio": {
+      "command": "npx",
+      "args": ["-y", "loopio-mcp"],
+      "env": {
+        "LOOPIO_CLIENT_ID": "${LOOPIO_CLIENT_ID}",
+        "LOOPIO_CLIENT_SECRET": "${LOOPIO_CLIENT_SECRET}"
+      }
+    }
+  }
+}
