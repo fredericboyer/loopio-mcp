@@ -16,6 +16,37 @@ Delete (require `LOOPIO_ENABLE_WRITES=true` and `LOOPIO_ENABLE_DELETES=true`): `
 
 In Loopio, sign in as an Admin and go to **Admin > Integrations > For Developers > Add an App**. Select the scopes you need (`library:read`, `project:read`, and optionally `library:write`, `project:write`, `library:delete`). Scopes cannot be changed after creation, so select every scope you might enable. Copy the Client ID and Secret (the secret is shown only once).
 
+## Claude Code
+
+### Plugin (recommended)
+
+Installs the MCP server config and a Loopio skill (RFP answering, library
+search, curation workflows) in one step:
+
+```
+/plugin marketplace add fredericboyer/loopio-mcp
+/plugin install loopio@loopio-mcp
+```
+
+Set `LOOPIO_CLIENT_ID` and `LOOPIO_CLIENT_SECRET` in your environment (the
+plugin's server config reads them via env-var expansion). Writes and deletes
+stay opt-in: set `LOOPIO_ENABLE_WRITES` / `LOOPIO_ENABLE_DELETES` in your
+environment only if you need them.
+
+Try prompts like:
+
+- "Answer this security questionnaire question from our Loopio library: …"
+- "Which Loopio library entries haven't been updated in over a year?"
+- "Summarize the status of our open RFP projects."
+
+### Standalone skill (no plugin)
+
+If you configured the MCP server manually (or use Claude Desktop for the
+server), you can install just the skill: copy `plugin/skills/loopio/` into
+`~/.claude/skills/` (user-wide) or `.claude/skills/` in a project. The skill
+only assumes the `loopio-mcp` tools exist, regardless of how the server was
+configured.
+
 ## MCP client configuration
 
 Add the server to your MCP client (Claude Desktop, Claude Code). Run it directly with `npx` (no checkout needed), or build from source.
