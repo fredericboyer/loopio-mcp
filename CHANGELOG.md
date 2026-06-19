@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-19
+
+### Security
+
+- Hardened the proxy-auth audit log against log injection: each
+  attacker-influenced field (forwarded identity name, client IP, request
+  method/tool) is now stripped of CR/LF and length-bounded individually before
+  logging, so a forwarded value can neither forge new log lines nor push the
+  fixed audit fields off a truncated record. Clears CodeQL `js/log-injection`.
+- Overrode the transitive `js-yaml` dependency to 4.2.0 (pulled in via the
+  `openapi-typescript` dev toolchain), clearing the last two moderate
+  advisories. `npm audit` now reports no known vulnerabilities.
+
 ## [0.3.0] - 2026-06-18
 
 ### Added
