@@ -39,8 +39,8 @@ function sanitizeLog(s: string): string {
 function describeRequest(body: unknown): string {
   if (!body || typeof body !== "object") return "?";
   const b = body as { method?: unknown; params?: { name?: unknown } };
-  const method = typeof b.method === "string" ? sanitizeLog(b.method) : "?";
-  const tool = typeof b.params?.name === "string" ? ` tool=${sanitizeLog(b.params.name)}` : "";
+  const method = typeof b.method === "string" ? b.method : "?";
+  const tool = typeof b.params?.name === "string" ? ` tool=${b.params.name}` : "";
   return `${method}${tool}`;
 }
 
@@ -69,12 +69,11 @@ export function createHttpApp(
       jsonRpcError(res, 401, -32001, "Unauthorized: missing or invalid proxy identity");
       return;
     }
-    // req.ip derives from X-Forwarded-* under trust-proxy, so it is also
-    // attacker-influenced — sanitize it like the other logged values.
-    const ip = sanitizeLog(req.ip ?? "?");
-    console.error(
-      `mcp request user=${sanitizeLog(principal.name)} ip=${ip} ${describeRequest(req.body)}`,
-    );
+    // Every interpolated value (principal name, req.ip via X-Forwarded-*, and
+    // the request method/tool) is attacker-influenced, so sanitize the whole
+    // composed line through one barrier right before logging.
+    const line = `mcp request user=${principal.name} ip=${req.ip ?? "?"} ${describeRequest(req.body)}`;
+    console.error(sanitizeLog(line));
     next();
   };
 
