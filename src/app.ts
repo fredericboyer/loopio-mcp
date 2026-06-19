@@ -24,7 +24,7 @@ export function createDeps(config: LoopioConfig): Deps {
 
 /** Build a configured McpServer. Cheap; call once for stdio, once per HTTP request. */
 export function buildMcpServer(deps: Deps, config: LoopioConfig): McpServer {
-  const server = new McpServer({ name: "loopio-mcp", version: "0.3.0" });
+  const server = new McpServer({ name: "loopio-mcp", version: "0.3.1" });
   const defs = [...libraryTools(deps.library), ...projectTools(deps.projects)];
   // Config carries a single read-only switch; the tool engine keeps the finer
   // read/write/delete tiers, so map across the boundary here.
