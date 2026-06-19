@@ -22,17 +22,17 @@ function jsonRpcError(res: express.Response, status: number, code: number, messa
 }
 
 /**
- * Neutralize values before they go into a log line: replace CR/LF and other
- * control characters with spaces (log-forging defense), collapse runs, and cap
- * length.
+ * Neutralize values before they go into a log line: replace CR/LF (and other
+ * whitespace control chars) with spaces so a value can't forge new log lines,
+ * collapse runs, and cap length. The explicit line-terminator replace is the
+ * log-injection barrier.
  */
 function sanitizeLog(s: string): string {
-  let out = "";
-  for (let i = 0; i < s.length; i++) {
-    const code = s.charCodeAt(i);
-    out += code < 0x20 || code === 0x7f ? " " : s[i];
-  }
-  return out.replace(/\s+/g, " ").trim().slice(0, 256);
+  return s
+    .replace(/[\r\n\t\f\v]/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim()
+    .slice(0, 256);
 }
 
 /** Best-effort method/tool label from a JSON-RPC body, for audit logging. */
