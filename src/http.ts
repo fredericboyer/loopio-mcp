@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { loadConfig, loadHttpConfig } from "./config.js";
+import { loadConfig, loadHttpConfig, exposureWarning } from "./config.js";
 import { createDeps } from "./app.js";
 import { createHttpApp } from "./http-app.js";
 
@@ -11,29 +11,21 @@ async function main(): Promise<void> {
   const app = createHttpApp(deps, config, {
     enableDnsRebindingProtection: true,
     allowedHosts: httpConfig.allowedHosts,
+    trustProxyAuth: httpConfig.trustProxyAuth,
+    principal: httpConfig.principal,
   });
 
-  const mode = config.enableDeletes
-    ? "writes+deletes"
-    : config.enableWrites
-      ? "writes"
-      : "read-only";
+  const mode = config.readOnly ? "read-only" : "writes+deletes";
 
-  // This server is unauthenticated and meant to sit behind an auth proxy. A
-  // mutating tier (writes, or writes+deletes) on a non-loopback bind means a
-  // misconfigured exposure could change or delete Loopio data. enableDeletes
-  // implies enableWrites, so this condition covers both.
-  if (config.enableWrites && httpConfig.host !== "127.0.0.1" && httpConfig.host !== "localhost") {
-    console.error(
-      `WARNING: ${mode} enabled and bound to ${httpConfig.host} (not loopback). ` +
-        "This server does not authenticate requests; ensure an auth proxy fronts it.",
-    );
-  }
+  // Surface the risk when the endpoint is reachable and unauthenticated.
+  const warning = exposureWarning(config, httpConfig);
+  if (warning) console.error(warning);
 
   const server = app.listen(httpConfig.port, httpConfig.host, () => {
     // stderr keeps stdout clean; HTTP transport does not use stdout for protocol.
+    const auth = httpConfig.trustProxyAuth ? "proxy-auth" : "no-auth";
     console.error(
-      `loopio-mcp HTTP listening on ${httpConfig.host}:${httpConfig.port} (${mode}); host=${config.host}`,
+      `loopio-mcp HTTP listening on ${httpConfig.host}:${httpConfig.port} (${mode}, ${auth}); host=${config.host}`,
     );
   });
 

@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { loadConfig, deriveScopes, loadHttpConfig } from "../src/config.js";
+import {
+  loadConfig,
+  deriveScopes,
+  loadHttpConfig,
+  exposureWarning,
+  type LoopioConfig,
+  type HttpConfig,
+} from "../src/config.js";
 
 const base = {
   LOOPIO_CLIENT_ID: "cid",
@@ -28,32 +35,35 @@ describe("loadConfig", () => {
   it("requires client id and secret", () => {
     expect(() => loadConfig({})).toThrow(/LOOPIO_CLIENT_ID/);
   });
-  it("derives urls and defaults", () => {
+  it("derives urls and defaults (read-write incl. deletes by default)", () => {
     const c = loadConfig(base);
     expect(c.tokenUrl).toBe("https://api.loopio.com/oauth2/access_token");
     expect(c.apiBaseUrl).toBe("https://api.loopio.com/data/v2");
-    expect(c.scopes).toEqual(["library:read", "project:read"]);
-    expect(c.enableWrites).toBe(false);
+    expect(c.readOnly).toBe(false);
+    expect(c.scopes).toContain("library:delete");
     expect(c.maxResults).toBe(200);
   });
-  it("honors host, flags, and scope override", () => {
+  it("read-only toggle disables writes, deletes, and their scopes", () => {
+    const c = loadConfig({ ...base, LOOPIO_READ_ONLY: "true" });
+    expect(c.readOnly).toBe(true);
+    expect(c.scopes).toEqual(["library:read", "project:read"]);
+  });
+  it("parses LOOPIO_READ_ONLY fail-closed (case variants and junk stay read-only)", () => {
+    for (const v of ["true", "True", "TRUE", "YES", "on", "weird", "ture"]) {
+      expect(loadConfig({ ...base, LOOPIO_READ_ONLY: v }).readOnly).toBe(true);
+    }
+    for (const v of ["false", "False", "0", "no", "off", ""]) {
+      expect(loadConfig({ ...base, LOOPIO_READ_ONLY: v }).readOnly).toBe(false);
+    }
+  });
+  it("honors host and max-results override", () => {
     const c = loadConfig({
       ...base,
       LOOPIO_HOST: "api.int01.loopio.com",
-      LOOPIO_ENABLE_WRITES: "true",
-      LOOPIO_ENABLE_DELETES: "true",
       LOOPIO_MAX_RESULTS: "50",
     });
     expect(c.apiBaseUrl).toBe("https://api.int01.loopio.com/data/v2");
-    expect(c.enableWrites).toBe(true);
-    expect(c.enableDeletes).toBe(true);
-    expect(c.scopes).toContain("library:delete");
     expect(c.maxResults).toBe(50);
-  });
-  it("ignores deletes when writes are off", () => {
-    const c = loadConfig({ ...base, LOOPIO_ENABLE_DELETES: "true" });
-    expect(c.enableDeletes).toBe(false);
-    expect(c.scopes).not.toContain("library:delete");
   });
   it("throws on non-numeric LOOPIO_MAX_RESULTS", () => {
     expect(() => loadConfig({ ...base, LOOPIO_MAX_RESULTS: "abc" })).toThrow(/LOOPIO_MAX_RESULTS/);
@@ -84,7 +94,59 @@ describe("loadHttpConfig", () => {
   });
 
   it("rejects an invalid port", () => {
-    expect(() => loadHttpConfig({ LOOPIO_HTTP_PORT: "0" })).toThrow(/LOOPIO_HTTP_PORT/);
-    expect(() => loadHttpConfig({ LOOPIO_HTTP_PORT: "70000" })).toThrow(/LOOPIO_HTTP_PORT/);
+    expect(() => loadHttpConfig({ LOOPIO_HTTP_PORT: "0" })).toThrow(/port/);
+    expect(() => loadHttpConfig({ LOOPIO_HTTP_PORT: "70000" })).toThrow(/port/);
+  });
+
+  it("falls back to PORT when LOOPIO_HTTP_PORT is unset, preferring the explicit var", () => {
+    expect(loadHttpConfig({ PORT: "8080" }).port).toBe(8080);
+    expect(loadHttpConfig({ PORT: "8080", LOOPIO_HTTP_PORT: "9090" }).port).toBe(9090);
+  });
+
+  it("defaults to no proxy-auth with Easy Auth principal headers", () => {
+    const c = loadHttpConfig({});
+    expect(c.trustProxyAuth).toBe(false);
+    expect(c.principal.header).toBe("x-ms-client-principal");
+    expect(c.principal.nameHeader).toBe("x-ms-client-principal-name");
+  });
+
+  it("enables proxy-auth and overrides principal header/claims", () => {
+    const c = loadHttpConfig({
+      LOOPIO_TRUST_PROXY_AUTH: "true",
+      LOOPIO_AUTH_PRINCIPAL_HEADER: "x-forwarded-user",
+      LOOPIO_AUTH_ROLES_CLAIM: "groups",
+    });
+    expect(c.trustProxyAuth).toBe(true);
+    expect(c.principal.header).toBe("x-forwarded-user");
+    expect(c.principal.rolesClaim).toBe("groups");
+  });
+});
+
+describe("exposureWarning", () => {
+  const cfg = (over: Partial<LoopioConfig> = {}): LoopioConfig =>
+    ({ readOnly: true, ...over }) as LoopioConfig;
+  const http = (over: Partial<HttpConfig> = {}): HttpConfig =>
+    ({ host: "0.0.0.0", trustProxyAuth: false, ...over }) as HttpConfig;
+
+  it("warns on a non-loopback bind without proxy-auth, even when read-only", () => {
+    const w = exposureWarning(cfg(), http());
+    expect(w).toContain("not loopback");
+    expect(w).toContain("LOOPIO_TRUST_PROXY_AUTH");
+    expect(w).not.toContain("Write tools");
+  });
+
+  it("adds the write-risk note when not read-only", () => {
+    const w = exposureWarning(cfg({ readOnly: false }), http());
+    expect(w).toContain("Write tools are enabled");
+    expect(w).toContain("LOOPIO_READ_ONLY=true");
+  });
+
+  it("is silent when proxy-auth is enabled", () => {
+    expect(exposureWarning(cfg({ readOnly: false }), http({ trustProxyAuth: true }))).toBeNull();
+  });
+
+  it("is silent on a loopback bind", () => {
+    expect(exposureWarning(cfg({ readOnly: false }), http({ host: "127.0.0.1" }))).toBeNull();
+    expect(exposureWarning(cfg(), http({ host: "localhost" }))).toBeNull();
   });
 });

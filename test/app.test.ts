@@ -13,8 +13,7 @@ function makeConfig(over: Partial<LoopioConfig> = {}): LoopioConfig {
     tokenUrl: "https://api.loopio.com/oauth2/access_token",
     apiBaseUrl: "https://api.loopio.com/data/v2",
     scopes: ["library:read", "project:read"],
-    enableWrites: false,
-    enableDeletes: false,
+    readOnly: true,
     maxResults: 200,
     ...over,
   };
@@ -58,18 +57,16 @@ describe("createDeps", () => {
 });
 
 describe("buildMcpServer", () => {
-  it("registers only read tools when writes are off", async () => {
+  it("registers only read tools when read-only", async () => {
     const names = await listToolNames(buildMcpServer(fakeDeps(), makeConfig()));
     expect(names).toContain("search_library");
     expect(names).not.toContain("create_library_entry");
     expect(names).not.toContain("delete_library_entry");
   });
 
-  it("includes write tools when writes are on", async () => {
-    const names = await listToolNames(
-      buildMcpServer(fakeDeps(), makeConfig({ enableWrites: true })),
-    );
+  it("includes write and delete tools when not read-only", async () => {
+    const names = await listToolNames(buildMcpServer(fakeDeps(), makeConfig({ readOnly: false })));
     expect(names).toContain("create_library_entry");
-    expect(names).not.toContain("delete_library_entry");
+    expect(names).toContain("delete_library_entry");
   });
 });
