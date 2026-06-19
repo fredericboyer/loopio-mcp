@@ -56,10 +56,12 @@ export function createHttpApp(
       return;
     }
     // Every interpolated value (principal name, req.ip via X-Forwarded-*, and
-    // the request method/tool) is attacker-influenced. Strip CR/LF inline right
-    // at the sink so a forwarded value can't forge new log lines, and cap length.
-    const line = `mcp request user=${principal.name} ip=${req.ip ?? "?"} ${describeRequest(req.body)}`;
-    console.error(line.replace(/\n|\r/g, " ").slice(0, 512));
+    // the request method/tool) is attacker-influenced. Strip CR/LF from each at
+    // its source so a forwarded value can't forge new log lines.
+    const user = principal.name.replace(/\n|\r/g, "");
+    const ip = (req.ip ?? "?").replace(/\n|\r/g, "");
+    const reqLabel = describeRequest(req.body).replace(/\n|\r/g, "");
+    console.error(`mcp request user=${user} ip=${ip} ${reqLabel}`.slice(0, 512));
     next();
   };
 
