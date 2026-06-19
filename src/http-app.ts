@@ -2,7 +2,11 @@ import express from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { LoopioConfig } from "./config.js";
 import { buildMcpServer, type Deps } from "./app.js";
-import { parsePrincipal, DEFAULT_PRINCIPAL_OPTIONS, type PrincipalOptions } from "./http-principal.js";
+import {
+  parsePrincipal,
+  DEFAULT_PRINCIPAL_OPTIONS,
+  type PrincipalOptions,
+} from "./http-principal.js";
 
 export interface HttpAppOptions {
   enableDnsRebindingProtection: boolean;
@@ -65,8 +69,11 @@ export function createHttpApp(
       jsonRpcError(res, 401, -32001, "Unauthorized: missing or invalid proxy identity");
       return;
     }
+    // req.ip derives from X-Forwarded-* under trust-proxy, so it is also
+    // attacker-influenced — sanitize it like the other logged values.
+    const ip = sanitizeLog(req.ip ?? "?");
     console.error(
-      `mcp request user=${sanitizeLog(principal.name)} ip=${req.ip} ${describeRequest(req.body)}`,
+      `mcp request user=${sanitizeLog(principal.name)} ip=${ip} ${describeRequest(req.body)}`,
     );
     next();
   };
