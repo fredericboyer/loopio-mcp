@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-18
+
 ### Added
 
 - HTTP transport proxy-auth mode (`LOOPIO_TRUST_PROXY_AUTH=true`): the server
@@ -41,6 +43,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Release (tag plus notes extracted from this file) and runs the npm staging
   and Docker GHCR publishes in the same pipeline; manually published releases
   still publish as a fallback. The Docker workflow now only builds on PRs.
+- Updated development dependencies to current versions (oxfmt, oxlint, vitest,
+  `@types/node`, esbuild).
+
+### Security
+
+- Patched the transitive `hono` dependency (pulled in via
+  `@modelcontextprotocol/sdk`) to 4.12.26, clearing a high-severity advisory.
+  Production dependencies report no known vulnerabilities. The affected `hono`
+  features (serve-static, Lambda adapters, Hono CORS) are not used by this
+  server, which runs over Express.
 
 ## [0.2.1] - 2026-06-09
 
