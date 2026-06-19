@@ -21,20 +21,6 @@ function jsonRpcError(res: express.Response, status: number, code: number, messa
   res.status(status).json({ jsonrpc: "2.0", error: { code, message }, id: null });
 }
 
-/**
- * Neutralize values before they go into a log line: replace CR/LF (and other
- * whitespace control chars) with spaces so a value can't forge new log lines,
- * collapse runs, and cap length. The explicit line-terminator replace is the
- * log-injection barrier.
- */
-function sanitizeLog(s: string): string {
-  return s
-    .replace(/[\r\n\t\f\v]/g, " ")
-    .replace(/ {2,}/g, " ")
-    .trim()
-    .slice(0, 256);
-}
-
 /** Best-effort method/tool label from a JSON-RPC body, for audit logging. */
 function describeRequest(body: unknown): string {
   if (!body || typeof body !== "object") return "?";
@@ -70,10 +56,10 @@ export function createHttpApp(
       return;
     }
     // Every interpolated value (principal name, req.ip via X-Forwarded-*, and
-    // the request method/tool) is attacker-influenced, so sanitize the whole
-    // composed line through one barrier right before logging.
+    // the request method/tool) is attacker-influenced. Strip CR/LF inline right
+    // at the sink so a forwarded value can't forge new log lines, and cap length.
     const line = `mcp request user=${principal.name} ip=${req.ip ?? "?"} ${describeRequest(req.body)}`;
-    console.error(sanitizeLog(line));
+    console.error(line.replace(/\n|\r/g, " ").slice(0, 512));
     next();
   };
 
