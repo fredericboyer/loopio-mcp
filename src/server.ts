@@ -8,11 +8,7 @@ async function main(): Promise<void> {
   const deps = createDeps(config);
   const server = buildMcpServer(deps, config);
 
-  const mode = config.enableDeletes
-    ? "writes+deletes"
-    : config.enableWrites
-      ? "writes"
-      : "read-only";
+  const mode = config.readOnly ? "read-only" : "writes+deletes";
   // stderr is safe; stdout is reserved for the MCP protocol.
   console.error(`loopio-mcp starting (${mode}); host=${config.host}`);
 

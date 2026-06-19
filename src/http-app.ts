@@ -2,14 +2,28 @@ import express from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { LoopioConfig } from "./config.js";
 import { buildMcpServer, type Deps } from "./app.js";
+import { parsePrincipal, DEFAULT_PRINCIPAL_OPTIONS, type PrincipalOptions } from "./http-principal.js";
 
 export interface HttpAppOptions {
   enableDnsRebindingProtection: boolean;
   allowedHosts: string[];
+  /** Require and log a forwarded identity from an authenticating proxy. */
+  trustProxyAuth?: boolean;
+  /** Header/claim names used to read the forwarded identity. */
+  principal?: PrincipalOptions;
 }
 
 function jsonRpcError(res: express.Response, status: number, code: number, message: string): void {
   res.status(status).json({ jsonrpc: "2.0", error: { code, message }, id: null });
+}
+
+/** Best-effort method/tool label from a JSON-RPC body, for audit logging. */
+function describeRequest(body: unknown): string {
+  if (!body || typeof body !== "object") return "?";
+  const b = body as { method?: unknown; params?: { name?: unknown } };
+  const method = typeof b.method === "string" ? b.method : "?";
+  const tool = typeof b.params?.name === "string" ? ` tool=${b.params.name}` : "";
+  return `${method}${tool}`;
 }
 
 export function createHttpApp(
@@ -18,13 +32,30 @@ export function createHttpApp(
   opts: HttpAppOptions,
 ): express.Express {
   const app = express();
+  if (opts.trustProxyAuth) {
+    // Behind a reverse proxy: trust X-Forwarded-* so req.ip reflects the client.
+    app.set("trust proxy", 1);
+  }
   app.use(express.json());
 
   app.get("/healthz", (_req, res) => {
     res.status(200).json({ status: "ok" });
   });
 
-  app.post("/mcp", async (req, res) => {
+  const principalOpts = opts.principal ?? DEFAULT_PRINCIPAL_OPTIONS;
+  const requireIdentity: express.RequestHandler = (req, res, next) => {
+    const principal = parsePrincipal(req.headers, principalOpts);
+    if (!principal) {
+      // Proxy-auth is on but no verified identity arrived: refuse rather than
+      // fall through to anonymous (guards against a proxy bypass).
+      jsonRpcError(res, 401, -32001, "Unauthorized: missing or invalid proxy identity");
+      return;
+    }
+    console.error(`mcp request user=${principal.name} ip=${req.ip} ${describeRequest(req.body)}`);
+    next();
+  };
+
+  const mcpHandler: express.RequestHandler = async (req, res) => {
     const server = buildMcpServer(deps, config);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
@@ -44,7 +75,13 @@ export function createHttpApp(
         jsonRpcError(res, 500, -32603, "Internal server error");
       }
     }
-  });
+  };
+
+  if (opts.trustProxyAuth) {
+    app.post("/mcp", requireIdentity, mcpHandler);
+  } else {
+    app.post("/mcp", mcpHandler);
+  }
 
   const methodNotAllowed = (_req: express.Request, res: express.Response) =>
     jsonRpcError(res, 405, -32000, "Method not allowed");

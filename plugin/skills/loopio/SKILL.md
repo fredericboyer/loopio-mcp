@@ -86,12 +86,11 @@ result or fabricate library content.
 
 ## Write and delete gating
 
-Mutating tools are opt-in on the server: `create_library_entry`,
-`update_library_entry`, and `answer_project_entry` require
-`LOOPIO_ENABLE_WRITES=true`; `delete_library_entry` additionally requires
-`LOOPIO_ENABLE_DELETES=true`. Gated-off tools are not registered at all, so
-their absence is configuration, not a bug. If asked to write while the tools
-are missing, explain the gate instead of retrying.
+Write and delete tools (`create_library_entry`, `update_library_entry`,
+`answer_project_entry`, `delete_library_entry`) are enabled by default and
+hidden when the server runs with `LOOPIO_READ_ONLY=true`. Gated-off tools are
+not registered at all, so their absence is configuration, not a bug. If asked
+to write while the tools are missing, explain the gate instead of retrying.
 
 ## Projects and reporting
 

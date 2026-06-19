@@ -16,8 +16,7 @@ function makeConfig(over: Partial<LoopioConfig> = {}): LoopioConfig {
     tokenUrl: "https://api.loopio.com/oauth2/access_token",
     apiBaseUrl: "https://api.loopio.com/data/v2",
     scopes: ["library:read", "project:read"],
-    enableWrites: false,
-    enableDeletes: false,
+    readOnly: true,
     maxResults: 200,
     ...over,
   };
@@ -118,5 +117,51 @@ describe("createHttpApp over Streamable HTTP", () => {
       body: "{not json",
     });
     expect(r.status).toBe(400);
+  });
+});
+
+describe("createHttpApp with proxy-auth", () => {
+  let authServer: Server;
+  let authUrl: string;
+
+  beforeAll(async () => {
+    const app = createHttpApp(deps, makeConfig(), {
+      enableDnsRebindingProtection: false,
+      allowedHosts: [],
+      trustProxyAuth: true,
+    });
+    await new Promise<void>((resolve) => {
+      authServer = app.listen(0, "127.0.0.1", () => resolve());
+    });
+    const { port } = authServer.address() as AddressInfo;
+    authUrl = `http://127.0.0.1:${port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => authServer.close(() => resolve()));
+  });
+
+  it("rejects a request with no forwarded identity (401)", async () => {
+    const r = await fetch(`${authUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+    });
+    expect(r.status).toBe(401);
+  });
+
+  it("accepts a request carrying a forwarded identity", async () => {
+    const client = new Client({ name: "test", version: "0.0.0" });
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(`${authUrl}/mcp`), {
+        requestInit: { headers: { "x-ms-client-principal-name": "jane@amilia.com" } },
+      }),
+    );
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name)).toContain("search_library");
+    await client.close();
   });
 });
