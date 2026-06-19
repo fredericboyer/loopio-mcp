@@ -44,6 +44,19 @@ describe("parsePrincipal", () => {
     expect(parsePrincipal({ "x-ms-client-principal": "!!!not-base64-json" }, opts)).toBeNull();
   });
 
+  it("returns null on a valid-JSON but non-object payload (e.g. base64 of null)", () => {
+    expect(parsePrincipal({ "x-ms-client-principal": encode(null) }, opts)).toBeNull();
+    expect(parsePrincipal({ "x-ms-client-principal": encode(42) }, opts)).toBeNull();
+  });
+
+  it("matches a configured mixed-case header against lower-cased request keys", () => {
+    const p = parsePrincipal(
+      { "x-forwarded-user": "jane@amilia.com" },
+      { ...opts, nameHeader: "X-Forwarded-User" },
+    );
+    expect(p).toEqual({ name: "jane@amilia.com", roles: [] });
+  });
+
   it("takes the first value of an array-valued header", () => {
     const p = parsePrincipal({ "x-ms-client-principal-name": ["jane@amilia.com", "x"] }, opts);
     expect(p?.name).toBe("jane@amilia.com");

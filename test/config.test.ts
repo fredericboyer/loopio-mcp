@@ -48,6 +48,14 @@ describe("loadConfig", () => {
     expect(c.readOnly).toBe(true);
     expect(c.scopes).toEqual(["library:read", "project:read"]);
   });
+  it("parses LOOPIO_READ_ONLY fail-closed (case variants and junk stay read-only)", () => {
+    for (const v of ["true", "True", "TRUE", "YES", "on", "weird", "ture"]) {
+      expect(loadConfig({ ...base, LOOPIO_READ_ONLY: v }).readOnly).toBe(true);
+    }
+    for (const v of ["false", "False", "0", "no", "off", ""]) {
+      expect(loadConfig({ ...base, LOOPIO_READ_ONLY: v }).readOnly).toBe(false);
+    }
+  });
   it("honors host and max-results override", () => {
     const c = loadConfig({
       ...base,

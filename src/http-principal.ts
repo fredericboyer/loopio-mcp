@@ -57,27 +57,33 @@ interface EasyAuthPrincipal {
  * proxy-auth mode treat null as "reject the request".
  */
 export function parsePrincipal(headers: Headers, opts: PrincipalOptions): Principal | null {
-  const nameDirect = firstValue(headers[opts.nameHeader])?.trim();
-  const raw = firstValue(headers[opts.header])?.trim();
+  // Node/Express expose incoming header keys in lower case, so normalize the
+  // configured (possibly mixed-case) header names before indexing.
+  const nameDirect = firstValue(headers[opts.nameHeader.toLowerCase()])?.trim();
+  const raw = firstValue(headers[opts.header.toLowerCase()])?.trim();
 
   let name = nameDirect;
   let roles: string[] = [];
 
   if (raw) {
-    let decoded: EasyAuthPrincipal;
+    let decoded: unknown;
     try {
-      decoded = JSON.parse(Buffer.from(raw, "base64").toString("utf8")) as EasyAuthPrincipal;
+      decoded = JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
     } catch {
       // A present-but-unparseable principal header is a misconfiguration or a
       // forgery attempt; refuse rather than silently treating it as anonymous.
       return null;
     }
-    const claims = Array.isArray(decoded.claims) ? decoded.claims : [];
+    // A syntactically valid but non-object payload (e.g. base64 of `null`) is
+    // equally malformed; refuse instead of throwing on field access.
+    if (decoded === null || typeof decoded !== "object") return null;
+    const principal = decoded as EasyAuthPrincipal;
+    const claims = Array.isArray(principal.claims) ? principal.claims : [];
     if (!name) {
-      const nameTyp = decoded.name_typ;
+      const nameTyp = principal.name_typ;
       name = claims.find((c) => c.typ === nameTyp || c.typ === opts.nameClaim)?.val;
     }
-    const roleTyp = decoded.role_typ ?? opts.rolesClaim;
+    const roleTyp = principal.role_typ ?? opts.rolesClaim;
     roles = claims
       .filter((c) => c.typ === roleTyp || c.typ === opts.rolesClaim)
       .map((c) => c.val)

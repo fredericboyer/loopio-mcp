@@ -16,7 +16,22 @@ export interface LoopioConfig {
 type Env = Record<string, string | undefined>;
 
 function boolEnv(v: string | undefined): boolean {
-  return v === "true" || v === "1";
+  if (v === undefined) return false;
+  const s = v.trim().toLowerCase();
+  return s === "true" || s === "1" || s === "yes" || s === "on";
+}
+
+/**
+ * Parse the read-only switch fail-closed. It is the only blast-radius control,
+ * so: unset keeps the read-write default, an explicit recognized "off" value
+ * (false/0/no/off, case-insensitive) enables writes, and ANY other value —
+ * including typos or case variants like `True` — stays read-only rather than
+ * silently enabling mutating tools.
+ */
+function readOnlyEnv(v: string | undefined): boolean {
+  if (v === undefined || v.trim() === "") return false;
+  const s = v.trim().toLowerCase();
+  return !(s === "false" || s === "0" || s === "no" || s === "off");
 }
 
 export function deriveScopes(enableWrites: boolean, enableDeletes: boolean): string[] {
@@ -36,7 +51,7 @@ export function loadConfig(env: Env = process.env): LoopioConfig {
   const apiBasePath = env.LOOPIO_API_BASE_PATH ?? "/data/v2";
   // Single switch: read-write by default (writes AND deletes), or set
   // LOOPIO_READ_ONLY=true to expose read tools only.
-  const readOnly = boolEnv(env.LOOPIO_READ_ONLY);
+  const readOnly = readOnlyEnv(env.LOOPIO_READ_ONLY);
 
   const scopes = env.LOOPIO_SCOPES
     ? env.LOOPIO_SCOPES.split(/\s+/).filter(Boolean)

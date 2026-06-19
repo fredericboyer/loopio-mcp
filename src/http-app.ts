@@ -17,12 +17,26 @@ function jsonRpcError(res: express.Response, status: number, code: number, messa
   res.status(status).json({ jsonrpc: "2.0", error: { code, message }, id: null });
 }
 
+/**
+ * Neutralize values before they go into a log line: replace CR/LF and other
+ * control characters with spaces (log-forging defense), collapse runs, and cap
+ * length.
+ */
+function sanitizeLog(s: string): string {
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    const code = s.charCodeAt(i);
+    out += code < 0x20 || code === 0x7f ? " " : s[i];
+  }
+  return out.replace(/\s+/g, " ").trim().slice(0, 256);
+}
+
 /** Best-effort method/tool label from a JSON-RPC body, for audit logging. */
 function describeRequest(body: unknown): string {
   if (!body || typeof body !== "object") return "?";
   const b = body as { method?: unknown; params?: { name?: unknown } };
-  const method = typeof b.method === "string" ? b.method : "?";
-  const tool = typeof b.params?.name === "string" ? ` tool=${b.params.name}` : "";
+  const method = typeof b.method === "string" ? sanitizeLog(b.method) : "?";
+  const tool = typeof b.params?.name === "string" ? ` tool=${sanitizeLog(b.params.name)}` : "";
   return `${method}${tool}`;
 }
 
@@ -51,7 +65,9 @@ export function createHttpApp(
       jsonRpcError(res, 401, -32001, "Unauthorized: missing or invalid proxy identity");
       return;
     }
-    console.error(`mcp request user=${principal.name} ip=${req.ip} ${describeRequest(req.body)}`);
+    console.error(
+      `mcp request user=${sanitizeLog(principal.name)} ip=${req.ip} ${describeRequest(req.body)}`,
+    );
     next();
   };
 
