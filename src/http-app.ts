@@ -21,26 +21,12 @@ function jsonRpcError(res: express.Response, status: number, code: number, messa
   res.status(status).json({ jsonrpc: "2.0", error: { code, message }, id: null });
 }
 
-/**
- * Neutralize values before they go into a log line: replace CR/LF (and other
- * whitespace control chars) with spaces so a value can't forge new log lines,
- * collapse runs, and cap length. The explicit line-terminator replace is the
- * log-injection barrier.
- */
-function sanitizeLog(s: string): string {
-  return s
-    .replace(/[\r\n\t\f\v]/g, " ")
-    .replace(/ {2,}/g, " ")
-    .trim()
-    .slice(0, 256);
-}
-
 /** Best-effort method/tool label from a JSON-RPC body, for audit logging. */
 function describeRequest(body: unknown): string {
   if (!body || typeof body !== "object") return "?";
   const b = body as { method?: unknown; params?: { name?: unknown } };
-  const method = typeof b.method === "string" ? sanitizeLog(b.method) : "?";
-  const tool = typeof b.params?.name === "string" ? ` tool=${sanitizeLog(b.params.name)}` : "";
+  const method = typeof b.method === "string" ? b.method : "?";
+  const tool = typeof b.params?.name === "string" ? ` tool=${b.params.name}` : "";
   return `${method}${tool}`;
 }
 
@@ -69,12 +55,15 @@ export function createHttpApp(
       jsonRpcError(res, 401, -32001, "Unauthorized: missing or invalid proxy identity");
       return;
     }
-    // req.ip derives from X-Forwarded-* under trust-proxy, so it is also
-    // attacker-influenced — sanitize it like the other logged values.
-    const ip = sanitizeLog(req.ip ?? "?");
-    console.error(
-      `mcp request user=${sanitizeLog(principal.name)} ip=${ip} ${describeRequest(req.body)}`,
-    );
+    // Every interpolated value (principal name, req.ip via X-Forwarded-*, and
+    // the request method/tool) is attacker-influenced. Strip CR/LF from each at
+    // its source so a forwarded value can't forge new log lines, and cap each
+    // field individually so a long forwarded value can't push the other audit
+    // fields off the (truncated) line.
+    const user = principal.name.replace(/\n|\r/g, "").slice(0, 200);
+    const ip = (req.ip ?? "?").replace(/\n|\r/g, "").slice(0, 64);
+    const reqLabel = describeRequest(req.body).replace(/\n|\r/g, "").slice(0, 120);
+    console.error(`mcp request user=${user} ip=${ip} ${reqLabel}`);
     next();
   };
 
