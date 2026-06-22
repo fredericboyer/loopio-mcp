@@ -1,15 +1,37 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { z, ZodRawShape } from "zod";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 
 export type Tier = "read" | "write" | "delete";
 
 export interface ToolDef<S extends ZodRawShape = ZodRawShape> {
   name: string;
+  /** Human-friendly display name shown in client UIs (falls back to `name`). */
+  title?: string;
   tier: Tier;
   description: string;
   inputSchema: S;
   handler: (args: z.infer<z.ZodObject<S>>) => Promise<CallToolResult>;
+}
+
+/**
+ * Maps our coarse access tier to MCP annotation hints. Clients (e.g. the
+ * Claude UI) group tools by these hints: `readOnlyHint: true` lands in the
+ * "Read-only tools" bucket, everything else in "Write/delete tools", where
+ * `destructiveHint` marks the irreversible ones for a stronger approval prompt.
+ *
+ * These are advisory hints for display/consent only; real gating stays in
+ * `selectTools`.
+ */
+export function annotationsForTier(tier: Tier): ToolAnnotations {
+  switch (tier) {
+    case "read":
+      return { readOnlyHint: true };
+    case "write":
+      return { readOnlyHint: false, destructiveHint: false };
+    case "delete":
+      return { readOnlyHint: false, destructiveHint: true };
+  }
 }
 
 /**
@@ -39,7 +61,12 @@ export function registerTools(server: McpServer, defs: ToolDef[], gating: ToolGa
   for (const def of selectTools(defs, gating)) {
     server.registerTool(
       def.name,
-      { description: def.description, inputSchema: def.inputSchema },
+      {
+        title: def.title ?? def.name,
+        description: def.description,
+        inputSchema: def.inputSchema,
+        annotations: annotationsForTier(def.tier),
+      },
       def.handler as never,
     );
   }

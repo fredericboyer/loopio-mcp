@@ -13,6 +13,7 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
   return [
     defineTool({
       name: "search_library",
+      title: "Search Loopio Library",
       tier: "read",
       description:
         "Search the Loopio Library for approved Q&A entries. Provide at least one filter. " +
@@ -48,6 +49,7 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
     }),
     defineTool({
       name: "get_library_entry",
+      title: "Get Loopio Library Entry",
       tier: "read",
       description: "Get the full detail of one Library entry by id.",
       inputSchema: {
@@ -65,6 +67,7 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
     }),
     defineTool({
       name: "get_library_structure",
+      title: "Get Loopio Library Structure",
       tier: "read",
       description:
         "List the full Library structure (stacks, categories, subcategories) for scoping searches and resolving location ids.",
@@ -73,6 +76,7 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
     }),
     defineTool({
       name: "create_library_entry",
+      title: "Create Loopio Library Entry",
       tier: "write",
       description: "Create a new Library Q&A entry in a stack/category.",
       inputSchema: {
@@ -99,6 +103,7 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
     }),
     defineTool({
       name: "update_library_entry",
+      title: "Update Loopio Library Entry",
       tier: "write",
       description:
         "Update a Library entry via JSON Patch. Example op: " +
@@ -121,6 +126,7 @@ export function libraryTools(api: LibraryApi): ToolDef[] {
     }),
     defineTool({
       name: "delete_library_entry",
+      title: "Delete Loopio Library Entry",
       tier: "delete",
       description: "Permanently delete a Library entry. Irreversible.",
       inputSchema: { id: z.number() },

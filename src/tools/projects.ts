@@ -7,6 +7,7 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
   return [
     defineTool({
       name: "list_projects",
+      title: "List Loopio Projects",
       tier: "read",
       description: "List Loopio projects, optionally filtered by RFx type and owner ids.",
       inputSchema: {
@@ -26,6 +27,7 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
     }),
     defineTool({
       name: "get_project",
+      title: "Get Loopio Project",
       tier: "read",
       description: "Get a project's data by id.",
       inputSchema: { id: z.number() },
@@ -33,6 +35,7 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
     }),
     defineTool({
       name: "get_project_questions",
+      title: "Get Loopio Project Questions",
       tier: "read",
       description:
         "List a project's entries (questions, current answers, status), filterable by section.",
@@ -55,6 +58,7 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
     }),
     defineTool({
       name: "get_project_status_summary",
+      title: "Get Loopio Project Status Summary",
       tier: "read",
       description:
         "Get status summaries for projects updated after a given ISO timestamp (for reporting/triage).",
@@ -66,6 +70,7 @@ export function projectTools(api: ProjectsApi): ToolDef[] {
     }),
     defineTool({
       name: "answer_project_entry",
+      title: "Answer Loopio Project Entry",
       tier: "write",
       description:
         "Set or update the answer (and optionally the question text) on a project entry.",
