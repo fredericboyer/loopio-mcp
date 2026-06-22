@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { selectTools, registerTools, type ToolDef } from "../src/tools/registry.js";
+import {
+  selectTools,
+  registerTools,
+  annotationsForTier,
+  type ToolDef,
+} from "../src/tools/registry.js";
 import { libraryTools } from "../src/tools/library.js";
 import { projectTools } from "../src/tools/projects.js";
 
@@ -56,6 +61,18 @@ describe("selectTools", () => {
   });
 });
 
+describe("annotationsForTier", () => {
+  it("maps read to a read-only hint", () => {
+    expect(annotationsForTier("read")).toEqual({ readOnlyHint: true });
+  });
+  it("maps write to non-read-only, non-destructive", () => {
+    expect(annotationsForTier("write")).toEqual({ readOnlyHint: false, destructiveHint: false });
+  });
+  it("maps delete to non-read-only, destructive", () => {
+    expect(annotationsForTier("delete")).toEqual({ readOnlyHint: false, destructiveHint: true });
+  });
+});
+
 describe("registerTools", () => {
   it("registers exactly the selected tools on the server", () => {
     const server = { registerTool: vi.fn() };
@@ -65,6 +82,23 @@ describe("registerTools", () => {
     expect(server.registerTool.mock.calls[0][1]).toMatchObject({ description: "r" });
     expect(server.registerTool.mock.calls[0][1]).toHaveProperty("inputSchema");
     expect(typeof server.registerTool.mock.calls[0][2]).toBe("function");
+  });
+
+  it("forwards tier annotations so clients can group by access level", () => {
+    const server = { registerTool: vi.fn() };
+    registerTools(server as any, defs, { enableWrites: true, enableDeletes: true });
+    const byName = Object.fromEntries(
+      server.registerTool.mock.calls.map((call) => [call[0], call[1]]),
+    );
+    expect(byName.read_tool.annotations).toEqual({ readOnlyHint: true });
+    expect(byName.write_tool.annotations).toEqual({ readOnlyHint: false, destructiveHint: false });
+    expect(byName.delete_tool.annotations).toEqual({ readOnlyHint: false, destructiveHint: true });
+  });
+
+  it("falls back to the tool name when no title is set", () => {
+    const server = { registerTool: vi.fn() };
+    registerTools(server as any, defs, { enableWrites: false, enableDeletes: false });
+    expect(server.registerTool.mock.calls[0][1].title).toBe("read_tool");
   });
 });
 
